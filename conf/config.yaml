@@ -43,12 +43,12 @@ postgresql:
   time-zone: "Asia/Shanghai" # Time zone for PostgreSQL connection
 
 rustdesk:
-  id-server: "192.168.1.66:21116"
-  relay-server: "192.168.1.66:21117"
-  api-server: "http://127.0.0.1:21114"
+  id-server: "10.202.10.250:21116"
+  relay-server: "10.202.10.250:21117"
+  api-server: "http://10.202.10.250:21114"
   hbbs-internal-url: "http://127.0.0.1:21120"
   hbbs-internal-key: ""
-  key: ""
+  key: "BTSnrzpozvz4Sn9GsiQapRG7ID+NsESJLaz3R69JB7k="
   key-file: "/data/id_ed25519.pub"
   personal: 1
   webclient-magic-queryonline: 0
