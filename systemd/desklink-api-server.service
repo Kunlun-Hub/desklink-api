@@ -1,0 +1,15 @@
+[Unit]
+Description=DeskLink Community API server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/desklink-api
+ExecStart=/root/desklink-api/release/apimain
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=1000000
+
+[Install]
+WantedBy=multi-user.target
