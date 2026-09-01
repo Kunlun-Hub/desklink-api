@@ -15,6 +15,8 @@ type Rustdesk struct {
 	RelayServer     string `mapstructure:"relay-server"`
 	RelayServerPort int    `mapstructure:"-"`
 	ApiServer       string `mapstructure:"api-server"`
+	HbbsInternalUrl string `mapstructure:"hbbs-internal-url"`
+	HbbsInternalKey string `mapstructure:"hbbs-internal-key"`
 	Key             string `mapstructure:"key"`
 	KeyFile         string `mapstructure:"key-file"`
 	Personal        int    `mapstructure:"personal"`

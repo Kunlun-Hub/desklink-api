@@ -77,3 +77,10 @@ type PeerInfoInHeartbeat struct {
 	Uuid string `json:"uuid"`
 	Ver  int    `json:"ver"`
 }
+
+type SwitchGrantForm struct {
+	Id                 string `json:"id" validate:"required"`
+	SwitchCodeVerifier string `json:"switch_code_verifier" validate:"required"`
+	Timestamp          string `json:"timestamp" validate:"required"`
+	Signature          string `json:"signature" validate:"required"`
+}

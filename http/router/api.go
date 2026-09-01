@@ -29,6 +29,7 @@ func ApiInit(g *gin.Engine) {
 		frg.GET("/version", i.Version)
 
 		frg.POST("/heartbeat", i.Heartbeat)
+		frg.POST("/switch-grant", i.SwitchGrant)
 	}
 
 	{

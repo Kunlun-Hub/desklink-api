@@ -25,6 +25,6 @@ The script does not print or persist the password or returned access token.
 
 ## hbbs-owned feature
 
-Client 1.4.9 introduces signed `switch-grant` registration for switching control sides while preserving ACL checks. The grant is consumed by a matching 1.4.9 `hbbs` implementation and must be verified against the device public key. This standalone API service does not accept unverified grants. Deploy the corresponding `hbbs` support before enabling that workflow; returning an unconditional success from the API would bypass the security property of the feature.
+Client 1.4.9 introduces signed `switch-grant` registration for switching control sides while preserving ACL checks. DeskLink API forwards these grants to DeskLink Server's loopback-only hbbs endpoint. hbbs verifies the device signature using the registered public key, binds the grant to that device, and expires it after 20 seconds. Configure `rustdesk.hbbs-internal-url` and the matching internal key before enabling this workflow.
 
 Session-recording upload is not advertised by this service. In the referenced 1.4.9 client source the upload flag remains disabled by default, so `/api/record` is not part of the active community contract.

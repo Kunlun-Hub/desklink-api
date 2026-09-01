@@ -1,16 +1,60 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/lejianwen/rustdesk-api/v2/global"
 	requstform "github.com/lejianwen/rustdesk-api/v2/http/request/api"
 	"github.com/lejianwen/rustdesk-api/v2/http/response"
 	"github.com/lejianwen/rustdesk-api/v2/model"
 	"github.com/lejianwen/rustdesk-api/v2/service"
 	"net/http"
+	"strings"
 	"time"
 )
 
 type Index struct {
+}
+
+func (i *Index) SwitchGrant(c *gin.Context) {
+	form := &requstform.SwitchGrantForm{}
+	if err := c.ShouldBindJSON(form); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"accepted": false, "error": "invalid request"})
+		return
+	}
+	internalURL := strings.TrimRight(global.Config.Rustdesk.HbbsInternalUrl, "/")
+	if internalURL == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"accepted": false, "error": "hbbs switch grants are not configured"})
+		return
+	}
+	body, err := json.Marshal(form)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"accepted": false})
+		return
+	}
+	request, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, internalURL+"/switch-grant", bytes.NewReader(body))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"accepted": false})
+		return
+	}
+	request.Header.Set("Content-Type", "application/json")
+	if key := global.Config.Rustdesk.HbbsInternalKey; key != "" {
+		request.Header.Set("X-DeskLink-Internal-Key", key)
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	response, err := client.Do(request)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"accepted": false, "error": "hbbs unavailable"})
+		return
+	}
+	defer response.Body.Close()
+	var result gin.H
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"accepted": false, "error": "invalid hbbs response"})
+		return
+	}
+	c.JSON(response.StatusCode, result)
 }
 
 // Index 首页
