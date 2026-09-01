@@ -88,6 +88,7 @@ DeskLink 社区服务端使用 Go 实现 RustDesk 兼容 API，并包含 React �
 * 初次安装管理员为用户名为`admin`，密码将在控制台打印，可以通过[命令行](#CLI)更改密码
 * 钉钉和企业微信登录配置见 [国内企业登录配置](docs/china-oauth.md)
 * DeskLink Server 联动配置：`rustdesk.hbbs-internal-url` 和 `rustdesk.hbbs-internal-key`
+* Docker + MySQL 生产部署见 [部署文档](docs/docker-mysql-deployment.md)
 
   ![img.png](./docs/init_admin_pwd.png)
 

@@ -26,17 +26,13 @@ type Rustdesk struct {
 }
 
 func (rd *Rustdesk) LoadKeyFile() {
-	// Load key file
-	if rd.Key != "" {
-		return
-	}
+	// Prefer an explicitly configured key file. Container deployments share the
+	// hbbs public key through this path, while the bundled config may contain a
+	// development key that must not override the mounted server identity.
 	if rd.KeyFile != "" {
-		// Load key from file
 		b, err := os.ReadFile(rd.KeyFile)
-		if err != nil {
-			return
+		if err == nil && len(b) > 0 {
+			rd.Key = string(b)
 		}
-		rd.Key = string(b)
-		return
 	}
 }

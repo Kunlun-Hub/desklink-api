@@ -153,11 +153,15 @@ func InitGlobal() {
 			global.Config.Mysql.Tls,
 		)
 
-		global.DB = orm.NewMysql(&orm.MysqlConfig{
+		var err error
+		global.DB, err = orm.NewMysql(&orm.MysqlConfig{
 			Dsn:          dsn,
 			MaxIdleConns: global.Config.Gorm.MaxIdleConns,
 			MaxOpenConns: global.Config.Gorm.MaxOpenConns,
 		}, global.Logger)
+		if err != nil {
+			global.Logger.Fatalf("failed to connect to MySQL: %v", err)
+		}
 	} else if global.Config.Gorm.Type == config.TypePostgresql {
 		dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s TimeZone=%s",
 			global.Config.Postgresql.Host,
@@ -232,9 +236,13 @@ func DatabaseAutoUpdate() {
 			)
 
 			//新链接
-			dbWithoutDB := orm.NewMysql(&orm.MysqlConfig{
+			dbWithoutDB, err := orm.NewMysql(&orm.MysqlConfig{
 				Dsn: dsnWithoutDB,
 			}, global.Logger)
+			if err != nil {
+				global.Logger.Errorf("连接 MySQL 失败: %v", err)
+				return
+			}
 			// 获取底层的 *sql.DB 对象，并确保在程序退出时关闭连接
 			sqlDBWithoutDB, err := dbWithoutDB.DB()
 			if err != nil {

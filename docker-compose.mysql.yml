@@ -1,0 +1,109 @@
+name: desklink
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: desklink-mysql
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-desklink}
+      MYSQL_USER: ${MYSQL_USER:-desklink}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${MYSQL_BIND_PORT:-3306}:3306"
+    volumes:
+      - desklink_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  hbbs:
+    image: ${DESKLINK_SERVER_IMAGE:-ohoimager/desklink-server:1.4.9}
+    container_name: desklink-hbbs
+    network_mode: host
+    command: ["hbbs", "-r", "${DESKLINK_PUBLIC_HOST:?Set DESKLINK_PUBLIC_HOST in .env}:21117"]
+    environment:
+      API_SERVER: http://127.0.0.1:21114
+      MUST_LOGIN: ${DESKLINK_MUST_LOGIN:-Y}
+      HBBS_API_BIND: 127.0.0.1:21120
+      HBBS_API_KEY: ${DESKLINK_HBBS_INTERNAL_KEY:?Set DESKLINK_HBBS_INTERNAL_KEY in .env}
+      RUST_LOG: ${RUST_LOG:-info}
+      TEST_HBBS: ${TEST_HBBS:-no}
+    volumes:
+      - desklink_server_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /data/id_ed25519.pub && nc -z 127.0.0.1 21116 && nc -z 127.0.0.1 21120"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  hbbr:
+    image: ${DESKLINK_SERVER_IMAGE:-ohoimager/desklink-server:1.4.9}
+    container_name: desklink-hbbr
+    network_mode: host
+    command: ["hbbr"]
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - desklink_server_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 21117"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    image: ${DESKLINK_API_IMAGE:-ohoimager/desklink-api:1.4.9}
+    container_name: desklink-api
+    network_mode: host
+    depends_on:
+      mysql:
+        condition: service_healthy
+      hbbs:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      RUSTDESK_API_LANG: ${DESKLINK_LANG:-zh-CN}
+      RUSTDESK_API_GORM_TYPE: mysql
+      RUSTDESK_API_GORM_MAX_IDLE_CONNS: ${MYSQL_MAX_IDLE_CONNS:-10}
+      RUSTDESK_API_GORM_MAX_OPEN_CONNS: ${MYSQL_MAX_OPEN_CONNS:-100}
+      RUSTDESK_API_MYSQL_ADDR: 127.0.0.1:${MYSQL_BIND_PORT:-3306}
+      RUSTDESK_API_MYSQL_USERNAME: ${MYSQL_USER:-desklink}
+      RUSTDESK_API_MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      RUSTDESK_API_MYSQL_DBNAME: ${MYSQL_DATABASE:-desklink}
+      RUSTDESK_API_MYSQL_TLS: ${MYSQL_TLS:-false}
+      RUSTDESK_API_RUSTDESK_ID_SERVER: ${DESKLINK_PUBLIC_HOST}:21116
+      RUSTDESK_API_RUSTDESK_RELAY_SERVER: ${DESKLINK_PUBLIC_HOST}:21117
+      RUSTDESK_API_RUSTDESK_API_SERVER: ${DESKLINK_API_PUBLIC_URL:?Set DESKLINK_API_PUBLIC_URL in .env}
+      RUSTDESK_API_RUSTDESK_KEY: ""
+      RUSTDESK_API_RUSTDESK_KEY_FILE: /server-data/id_ed25519.pub
+      RUSTDESK_API_RUSTDESK_HBBS_INTERNAL_URL: http://127.0.0.1:21120
+      RUSTDESK_API_RUSTDESK_HBBS_INTERNAL_KEY: ${DESKLINK_HBBS_INTERNAL_KEY}
+      RUSTDESK_API_APP_REGISTER: ${DESKLINK_ALLOW_REGISTER:-false}
+      RUSTDESK_API_APP_SHOW_SWAGGER: ${DESKLINK_SHOW_SWAGGER:-0}
+      RUSTDESK_API_APP_WEB_CLIENT: ${DESKLINK_WEB_CLIENT:-1}
+      RUSTDESK_API_RUSTDESK_PERSONAL: ${DESKLINK_PERSONAL_ADDRESS_BOOK:-1}
+    volumes:
+      - desklink_server_data:/server-data:ro
+      - desklink_api_runtime:/app/runtime
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:21114/api/version"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  desklink_mysql_data:
+  desklink_server_data:
+  desklink_api_runtime:

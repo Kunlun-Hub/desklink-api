@@ -5,6 +5,7 @@ docker-compose-dev.yaml
 # Ignore development Dockerfile
 Dockerfile
 Dockerfile.dev
+Dockerfile.production
 docker-dev.sh
 
 # Ignore the data directory
