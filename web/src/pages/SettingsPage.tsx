@@ -25,7 +25,7 @@ export default function SettingsPage() {
         <div className="divide-y divide-base-200">
           {rows.map((row) => {
             const Icon = row.icon
-            return <div key={row.label} className="grid gap-3 px-5 py-4 sm:grid-cols-[180px_1fr_auto] sm:items-center"><div className="flex items-center gap-2 text-sm text-base-content/55"><Icon size={16} />{row.label}</div><code className="min-w-0 truncate rounded bg-base-200 px-2 py-1.5 text-xs">{config ? row.value || '未配置' : '加载中…'}</code>{row.value && <button className="btn btn-ghost btn-xs" onClick={() => void copy(row.value)} title="复制"><Copy size={14} /></button>}</div>
+            return <div key={row.label} className="grid min-h-16 gap-3 px-5 py-3 sm:grid-cols-[180px_minmax(0,1fr)_32px] sm:items-center"><div className="flex items-center gap-2 text-sm text-base-content/55"><Icon size={16} />{row.label}</div><code className="flex h-9 min-w-0 items-center truncate rounded bg-base-200 px-3 text-xs">{config ? row.value || '未配置' : '加载中…'}</code><div className="flex h-8 w-8 items-center justify-center">{row.value && <button className="btn btn-ghost btn-xs h-8 min-h-8 w-8 p-0" onClick={() => void copy(row.value)} title="复制"><Copy size={14} /></button>}</div></div>
           })}
         </div>
       </div>

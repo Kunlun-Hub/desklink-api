@@ -37,16 +37,19 @@ function Cell({ column, value }: { column: ResourceColumn; value: unknown }) {
 function FormField({ field, value, onChange }: { field: ResourceField; value: unknown; onChange: (value: unknown) => void }) {
   if (field.kind === 'boolean') {
     return (
-      <label className="flex h-10 items-center justify-between rounded-md border border-base-300 px-3">
-        <span className="text-sm">{field.label}</span>
-        <input type="checkbox" className="toggle toggle-success toggle-sm" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} />
+      <label className="desklink-field">
+        <span className="label text-xs text-base-content/60">{field.label}</span>
+        <span className="flex h-9 items-center justify-between rounded-md border border-base-300 px-3">
+          <span className="text-xs text-base-content/50">{value ? '已启用' : '未启用'}</span>
+          <input type="checkbox" className="toggle toggle-success toggle-sm" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} />
+        </span>
       </label>
     )
   }
   if (field.kind === 'select') {
     return (
-      <label className="form-control">
-        <span className="label pb-1 text-xs text-base-content/60">{field.label}</span>
+      <label className="desklink-field">
+        <span className="label text-xs text-base-content/60">{field.label}</span>
         <select className="select select-bordered select-sm w-full" value={String(value ?? '')} onChange={(event) => {
           const option = field.options?.find((item) => String(item.value) === event.target.value)
           onChange(option?.value ?? event.target.value)
@@ -58,8 +61,8 @@ function FormField({ field, value, onChange }: { field: ResourceField; value: un
   }
   const display = field.kind === 'tags' && Array.isArray(value) ? value.join(', ') : String(value ?? '')
   return (
-    <label className="form-control">
-      <span className="label pb-1 text-xs text-base-content/60">{field.label}{field.required && <span className="ml-1 text-error">*</span>}</span>
+    <label className="desklink-field">
+      <span className="label text-xs text-base-content/60">{field.label}{field.required && <span className="ml-1 text-error">*</span>}</span>
       <input type={field.kind === 'number' ? 'number' : field.kind === 'password' ? 'password' : 'text'} className="input input-bordered input-sm w-full" value={display} placeholder={field.placeholder} required={field.required} onChange={(event) => {
         if (field.kind === 'number') onChange(event.target.value === '' ? 0 : Number(event.target.value))
         else if (field.kind === 'tags') onChange(event.target.value.split(',').map((item) => item.trim()).filter(Boolean))
@@ -128,6 +131,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
   }
 
   const visibleFields = useMemo(() => config.fields?.filter((field) => editing ? !field.createOnly : !field.editOnly) || [], [config.fields, editing])
+  const modalResourceName = config.title.endsWith('管理') ? config.title.slice(0, -2) : config.title
 
   return (
     <section>
@@ -137,21 +141,21 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
           <p className="mt-1 text-sm text-base-content/50">{config.description}</p>
         </div>
         <div className="flex gap-2">
-          <button className="btn btn-sm btn-ghost border border-base-300 bg-white" onClick={() => void load()} title="刷新"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /></button>
-          {!config.readOnly && config.createPath && <button className="btn btn-sm border-0 bg-emerald-600 text-white hover:bg-emerald-700" onClick={startCreate}><Plus size={16} />新增</button>}
+          <button className="btn btn-sm btn-ghost desklink-icon-action border border-base-300 bg-white" onClick={() => void load()} title="刷新"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /></button>
+          {!config.readOnly && config.createPath && <button className="btn btn-sm desklink-action border-0 bg-emerald-600 px-4 text-white hover:bg-emerald-700" onClick={startCreate}><Plus size={16} />新增</button>}
         </div>
       </div>
 
       {config.search?.length ? (
         <form className="desklink-card mb-4 flex flex-wrap items-end gap-3 p-4" onSubmit={(event) => { event.preventDefault(); setPage(1); setAppliedQuery(query) }}>
           {config.search.map((field) => (
-            <label key={field.key} className="form-control w-full sm:w-52">
-              <span className="label pb-1 text-[11px] text-base-content/55">{field.label}</span>
+            <label key={field.key} className="desklink-field w-full sm:w-52">
+              <span className="label text-[11px] text-base-content/55">{field.label}</span>
               <input className="input input-bordered input-sm w-full bg-white" value={query[field.key] || ''} placeholder={field.placeholder || `输入${field.label}`} onChange={(event) => setQuery((current) => ({ ...current, [field.key]: event.target.value }))} />
             </label>
           ))}
-          <button className="btn btn-sm btn-neutral"><Search size={15} />筛选</button>
-          <button type="button" className="btn btn-sm btn-ghost" onClick={() => { setQuery({}); setAppliedQuery({}); setPage(1) }}>重置</button>
+          <button className="btn btn-sm desklink-action btn-neutral px-4"><Search size={15} />筛选</button>
+          <button type="button" className="btn btn-sm desklink-action btn-ghost px-4" onClick={() => { setQuery({}); setAppliedQuery({}); setPage(1) }}>重置</button>
         </form>
       ) : null}
 
@@ -187,18 +191,18 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
 
       {editing !== undefined && (
         <div className="modal modal-open">
-          <div className="modal-box max-w-2xl rounded-lg p-0">
+          <div className="modal-box desklink-modal max-w-2xl rounded-lg p-0">
             <div className="flex h-14 items-center justify-between border-b border-base-300 px-5">
-              <h3 className="font-semibold">{editing ? `编辑${config.title}` : `新增${config.title}`}</h3>
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(undefined)}><X size={18} /></button>
+              <h3 className="font-semibold">{editing ? `编辑${modalResourceName}` : `新增${modalResourceName}`}</h3>
+              <button className="btn btn-ghost btn-sm desklink-icon-action" onClick={() => setEditing(undefined)}><X size={18} /></button>
             </div>
             <form onSubmit={(event) => void save(event)}>
               <div className="grid max-h-[65vh] grid-cols-1 gap-4 overflow-y-auto p-5 sm:grid-cols-2">
                 {visibleFields.map((field) => <FormField key={field.key} field={field} value={form[field.key]} onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))} />)}
               </div>
               <div className="flex justify-end gap-2 border-t border-base-300 bg-base-200/40 px-5 py-4">
-                <button type="button" className="btn btn-sm btn-ghost" onClick={() => setEditing(undefined)}>取消</button>
-                <button className="btn btn-sm border-0 bg-emerald-600 text-white hover:bg-emerald-700">保存</button>
+                <button type="button" className="btn btn-sm desklink-action btn-ghost px-4" onClick={() => setEditing(undefined)}>取消</button>
+                <button className="btn btn-sm desklink-action border-0 bg-emerald-600 px-4 text-white hover:bg-emerald-700">保存</button>
               </div>
             </form>
           </div>

@@ -51,8 +51,8 @@ export default function ProfilePage() {
   return (
     <section className="max-w-4xl">
       <div className="mb-5"><h1 className="text-xl font-semibold">个人资料</h1><p className="mt-1 text-sm text-base-content/50">管理账号安全和第三方登录绑定。</p></div>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="desklink-card p-5">
+      <div className="grid items-stretch gap-5 lg:grid-cols-2">
+        <div className="desklink-card h-full p-5">
           <div className="mb-5 flex items-center gap-2"><UserRound size={18} className="text-emerald-600" /><h2 className="text-sm font-semibold">账号信息</h2></div>
           <dl className="space-y-4 text-sm">
             <div className="flex items-center justify-between border-b border-base-200 pb-3"><dt className="flex items-center gap-2 text-base-content/50"><UserRound size={15} />用户名</dt><dd className="font-medium">{user?.username}</dd></div>
@@ -60,14 +60,14 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between"><dt className="flex items-center gap-2 text-base-content/50"><ShieldCheck size={15} />权限</dt><dd><span className="badge badge-success badge-soft badge-sm">{user?.route_names?.includes('*') ? '管理员' : '普通用户'}</span></dd></div>
           </dl>
         </div>
-        <form className="desklink-card p-5" onSubmit={(event) => void changePassword(event)}>
+        <form data-testid="password-form" className="desklink-card flex h-full flex-col p-5" onSubmit={(event) => void changePassword(event)}>
           <div className="mb-5 flex items-center gap-2"><KeyRound size={18} className="text-amber-600" /><h2 className="text-sm font-semibold">修改密码</h2></div>
           <div className="space-y-3">
-            <label className="form-control"><span className="label pb-1 text-xs text-base-content/55">当前密码</span><input type="password" className="input input-bordered input-sm" value={oldPassword} onChange={(event) => setOldPassword(event.target.value)} required minLength={4} /></label>
-            <label className="form-control"><span className="label pb-1 text-xs text-base-content/55">新密码</span><input type="password" className="input input-bordered input-sm" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required minLength={4} maxLength={32} /></label>
-            <label className="form-control"><span className="label pb-1 text-xs text-base-content/55">确认新密码</span><input type="password" className="input input-bordered input-sm" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required /></label>
+            <label className="desklink-field"><span className="label text-xs text-base-content/55">当前密码</span><input type="password" className="input input-bordered input-sm" value={oldPassword} onChange={(event) => setOldPassword(event.target.value)} required minLength={4} /></label>
+            <label className="desklink-field"><span className="label text-xs text-base-content/55">新密码</span><input type="password" className="input input-bordered input-sm" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required minLength={4} maxLength={32} /></label>
+            <label className="desklink-field"><span className="label text-xs text-base-content/55">确认新密码</span><input type="password" className="input input-bordered input-sm" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required /></label>
           </div>
-          <button className="btn btn-sm mt-4 border-0 bg-emerald-600 text-white hover:bg-emerald-700" disabled={saving}>{saving && <span className="loading loading-spinner loading-xs" />}更新密码</button>
+          <button className="btn btn-sm desklink-action mt-4 self-start border-0 bg-emerald-600 px-4 text-white hover:bg-emerald-700" disabled={saving}>{saving && <span className="loading loading-spinner loading-xs" />}更新密码</button>
         </form>
       </div>
 

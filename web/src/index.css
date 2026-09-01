@@ -19,14 +19,59 @@ button, input, select, textarea { letter-spacing: 0; }
 
 .desklink-shell { min-height: 100vh; background: #f4f6f7; }
 .desklink-sidebar { background: #111719; color: #d6dddf; }
+.desklink-sidebar nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
 .desklink-sidebar .menu a.active { background: #253136; color: #fff; }
 .desklink-sidebar .menu a:hover { background: #1d272b; color: #fff; }
 .desklink-card { border: 1px solid #e1e6e8; background: #fff; border-radius: 8px; }
+.desklink-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: stretch;
+  gap: 6px;
+}
+.desklink-field > .label {
+  display: block;
+  min-height: 16px;
+  padding: 0;
+  line-height: 16px;
+}
+.desklink-field > .input,
+.desklink-field > .select {
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+}
+.desklink-field > .textarea { width: 100%; }
+.desklink-action {
+  height: 36px;
+  min-height: 36px;
+}
+.desklink-icon-action {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+.desklink-panel-header { min-height: 48px; }
+.modal-box,
+.desklink-modal {
+  border: 1px solid #e1e6e8;
+  background: #fff;
+  color: #202629;
+  box-shadow: 0 24px 64px rgba(16, 24, 28, 0.24);
+}
 .desklink-table th { color: #667176; font-size: 12px; font-weight: 600; text-transform: none; }
-.desklink-table td { font-size: 13px; }
+.desklink-table th,
+.desklink-table td { vertical-align: middle; }
+.desklink-table td { height: 44px; font-size: 13px; }
 .desklink-stat { border-left: 3px solid #38a169; }
 
-@media (max-width: 900px) {
+@media (max-width: 1023px) {
   .desklink-desktop-nav { display: none; }
   .desklink-main { margin-left: 0 !important; }
 }

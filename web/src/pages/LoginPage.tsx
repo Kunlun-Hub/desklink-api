@@ -117,14 +117,14 @@ export default function LoginPage() {
 
           {!options?.disable_pwd && (
             <form onSubmit={submit} className="space-y-4">
-              <label className="form-control w-full">
+              <label className="desklink-field w-full">
                 <span className="label pb-1 text-xs text-white/55">用户名</span>
                 <div className="flex h-11 items-center rounded-md border border-white/12 bg-white/5 px-3 focus-within:border-emerald-500/70">
                   <UserRound size={17} className="mr-2 text-white/35" />
                   <input className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/20" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="请输入用户名" required />
                 </div>
               </label>
-              <label className="form-control w-full">
+              <label className="desklink-field w-full">
                 <span className="label pb-1 text-xs text-white/55">密码</span>
                 <div className="flex h-11 items-center rounded-md border border-white/12 bg-white/5 px-3 focus-within:border-emerald-500/70">
                   <LockKeyhole size={17} className="mr-2 text-white/35" />
@@ -133,7 +133,7 @@ export default function LoginPage() {
                 </div>
               </label>
               {captcha && (
-                <label className="form-control w-full">
+                <label className="desklink-field w-full">
                   <span className="label pb-1 text-xs text-white/55">验证码</span>
                   <div className="flex h-11 overflow-hidden rounded-md border border-white/12 bg-white/5 focus-within:border-emerald-500/70">
                     <input className="min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none" value={captchaValue} onChange={(event) => setCaptchaValue(event.target.value)} required />

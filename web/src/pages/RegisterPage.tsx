@@ -31,7 +31,7 @@ export default function RegisterPage() {
           <form className="space-y-4" onSubmit={(event) => void submit(event)}>
             {[
               ['username', '用户名', 'text'], ['email', '邮箱（可选）', 'email'], ['password', '密码', 'password'], ['confirm_password', '确认密码', 'password'],
-            ].map(([key, label, type]) => <label key={key} className="form-control"><span className="label pb-1 text-xs text-white/55">{label}</span><input type={type} className="input h-10 w-full border-white/12 bg-white/5 text-sm text-white placeholder:text-white/20 focus:border-emerald-500" value={form[key as keyof typeof form]} onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))} required={key !== 'email'} minLength={key === 'username' ? 2 : type === 'password' ? 4 : undefined} maxLength={type === 'password' ? 32 : undefined} /></label>)}
+            ].map(([key, label, type]) => <label key={key} className="desklink-field"><span className="label text-xs text-white/55">{label}</span><input type={type} className="input h-10 w-full border-white/12 bg-white/5 text-sm text-white placeholder:text-white/20 focus:border-emerald-500" value={form[key as keyof typeof form]} onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))} required={key !== 'email'} minLength={key === 'username' ? 2 : type === 'password' ? 4 : undefined} maxLength={type === 'password' ? 32 : undefined} /></label>)}
             <button className="btn h-10 w-full border-0 bg-emerald-500 text-white hover:bg-emerald-600" disabled={saving}>{saving ? <span className="loading loading-spinner loading-sm" /> : <UserPlus size={17} />}创建账号</button>
           </form>
         </div>
