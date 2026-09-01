@@ -15,6 +15,15 @@ interface LoginOptions {
 
 interface CaptchaResponse { captcha: { id: string; b64: string } }
 
+const providerLabels: Record<string, string> = {
+  dingtalk: '钉钉',
+  wecom: '企业微信',
+  github: 'GitHub',
+  google: 'Google',
+  linuxdo: 'Linux.do',
+  oidc: 'OIDC',
+}
+
 function platformName() {
   const value = navigator.platform.toLowerCase()
   if (value.includes('win')) return 'windows'
@@ -153,7 +162,7 @@ export default function LoginPage() {
             <div className="mt-6">
               <div className="divider text-xs text-white/30">其他登录方式</div>
               <div className="grid gap-2">
-                {options.ops.map((option) => <button key={option} onClick={() => void oidcLogin(option)} className="btn btn-outline border-white/15 text-white/70 hover:border-white/30 hover:bg-white/5">使用 {option} 登录</button>)}
+                {options.ops.map((option) => <button key={option} onClick={() => void oidcLogin(option)} className="btn btn-outline border-white/15 text-white/70 hover:border-white/30 hover:bg-white/5">使用 {providerLabels[option.toLowerCase()] || option} 登录</button>)}
               </div>
             </div>
           ) : null}

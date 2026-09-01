@@ -86,6 +86,7 @@ DeskLink 社区服务端使用 Go 实现 RustDesk 兼容 API，并包含 React �
 
 * 后台访问地址是`http://<your server>[:port]/_admin/`
 * 初次安装管理员为用户名为`admin`，密码将在控制台打印，可以通过[命令行](#CLI)更改密码
+* 钉钉和企业微信登录配置见 [国内企业登录配置](docs/china-oauth.md)
 
   ![img.png](./docs/init_admin_pwd.png)
 

@@ -10,19 +10,21 @@ const OIDC_DEFAULT_SCOPES = "openid,profile,email"
 
 const (
 	// make sure the value shouldbe lowercase
-	OauthTypeGithub  string = "github"
-	OauthTypeGoogle  string = "google"
-	OauthTypeOidc    string = "oidc"
-	OauthTypeWebauth string = "webauth"
-	OauthTypeLinuxdo string = "linuxdo"
-	PKCEMethodS256   string = "S256"
-	PKCEMethodPlain  string = "plain"
+	OauthTypeGithub   string = "github"
+	OauthTypeGoogle   string = "google"
+	OauthTypeOidc     string = "oidc"
+	OauthTypeWebauth  string = "webauth"
+	OauthTypeLinuxdo  string = "linuxdo"
+	OauthTypeDingTalk string = "dingtalk"
+	OauthTypeWeCom    string = "wecom"
+	PKCEMethodS256    string = "S256"
+	PKCEMethodPlain   string = "plain"
 )
 
 // Validate the oauth type
 func ValidateOauthType(oauthType string) error {
 	switch oauthType {
-	case OauthTypeGithub, OauthTypeGoogle, OauthTypeOidc, OauthTypeWebauth, OauthTypeLinuxdo:
+	case OauthTypeGithub, OauthTypeGoogle, OauthTypeOidc, OauthTypeWebauth, OauthTypeLinuxdo, OauthTypeDingTalk, OauthTypeWeCom:
 		return nil
 	default:
 		return errors.New("invalid Oauth type")
@@ -40,7 +42,9 @@ type Oauth struct {
 	Op           string `json:"op"`
 	OauthType    string `json:"oauth_type"`
 	ClientId     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
+	ClientSecret string `json:"-"`
+	AgentId      string `json:"agent_id" gorm:"default:'';not null;"`
+	CorpId       string `json:"corp_id" gorm:"default:'';not null;"`
 	//RedirectUrl  string `json:"redirect_url"`
 	AutoRegister *bool  `json:"auto_register"`
 	Scopes       string `json:"scopes"`
@@ -64,6 +68,13 @@ func (oa *Oauth) FormatOauthInfo() error {
 		oa.Op = OauthTypeGoogle
 	case OauthTypeLinuxdo:
 		oa.Op = OauthTypeLinuxdo
+	case OauthTypeDingTalk:
+		oa.Op = OauthTypeDingTalk
+	case OauthTypeWeCom:
+		oa.Op = OauthTypeWeCom
+		if strings.TrimSpace(oa.AgentId) == "" {
+			return errors.New("agent ID is required for WeCom")
+		}
 	}
 	// check if the op is empty, set the default value
 	op := strings.TrimSpace(oa.Op)
@@ -79,6 +90,10 @@ func (oa *Oauth) FormatOauthInfo() error {
 	if oa.PkceEnable == nil {
 		oa.PkceEnable = new(bool)
 		*oa.PkceEnable = false
+	}
+	if oa.AutoRegister == nil {
+		oa.AutoRegister = new(bool)
+		*oa.AutoRegister = false
 	}
 	if oa.PkceMethod == "" {
 		oa.PkceMethod = PKCEMethodS256
@@ -161,6 +176,48 @@ type LinuxdoUser struct {
 	Id       int    `json:"id"`
 	Username string `json:"username"`
 	Avatar   string `json:"avatar_url"`
+}
+
+type DingTalkUser struct {
+	Nick      string `json:"nick"`
+	OpenId    string `json:"openId"`
+	UnionId   string `json:"unionId"`
+	AvatarUrl string `json:"avatarUrl"`
+	Email     string `json:"email"`
+}
+
+func (u *DingTalkUser) ToOauthUser() *OauthUser {
+	openId := u.UnionId
+	if openId == "" {
+		openId = u.OpenId
+	}
+	username := u.OpenId
+	if username == "" {
+		username = openId
+	}
+	return &OauthUser{
+		OpenId: openId, Username: username, Name: u.Nick, Email: u.Email,
+		VerifiedEmail: u.Email != "", Picture: u.AvatarUrl,
+	}
+}
+
+type WeComUser struct {
+	UserId  string `json:"userid"`
+	Name    string `json:"name"`
+	Email   string `json:"email"`
+	BizMail string `json:"biz_mail"`
+	Avatar  string `json:"avatar"`
+}
+
+func (u *WeComUser) ToOauthUser() *OauthUser {
+	email := u.Email
+	if email == "" {
+		email = u.BizMail
+	}
+	return &OauthUser{
+		OpenId: u.UserId, Username: u.UserId, Name: u.Name, Email: email,
+		VerifiedEmail: email != "", Picture: u.Avatar,
+	}
 }
 
 func (lu *LinuxdoUser) ToOauthUser() *OauthUser {

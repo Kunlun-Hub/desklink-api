@@ -112,6 +112,19 @@ test('admin can log in and open core management pages', async ({ page }, testInf
         await page.screenshot({ path: '/tmp/desklink-user-modal-aligned.png', fullPage: true })
         await page.getByRole('button', { name: '取消' }).click()
       }
+      if (route === 'admin/oauth') {
+        await page.getByRole('button', { name: '新增' }).click()
+        const oauthModal = page.locator('.modal')
+        const providerSelect = oauthModal.locator('select').first()
+        await providerSelect.selectOption('wecom')
+        await expect(oauthModal.getByLabel(/AgentID/)).toBeVisible()
+        await expect(oauthModal.getByText('Issuer URL', { exact: true })).toHaveCount(0)
+        await providerSelect.selectOption('dingtalk')
+        await expect(oauthModal.getByLabel(/^CorpID/)).toBeVisible()
+        await expect(oauthModal.getByLabel(/AgentID/)).toHaveCount(0)
+        await expectControlsAligned(page)
+        await page.getByRole('button', { name: '取消' }).click()
+      }
     }
   } else {
     await page.getByRole('button', { name: '打开导航' }).click()

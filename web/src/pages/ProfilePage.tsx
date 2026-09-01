@@ -6,6 +6,8 @@ import { useToast } from '../components/Toast'
 
 interface OauthBinding { op: string; status: number }
 
+const providerLabels: Record<string, string> = { dingtalk: '钉钉', wecom: '企业微信' }
+
 export default function ProfilePage() {
   const { user } = useAuth()
   const { show } = useToast()
@@ -73,7 +75,7 @@ export default function ProfilePage() {
 
       <div className="desklink-card mt-5 overflow-hidden">
         <div className="border-b border-base-300 px-5 py-4"><h2 className="text-sm font-semibold">第三方账号</h2><p className="mt-1 text-xs text-base-content/45">绑定后可使用对应身份提供商登录。</p></div>
-        {bindings.length ? <div className="divide-y divide-base-200">{bindings.map((item) => <div key={item.op} className="flex items-center gap-3 px-5 py-4"><div className="flex h-9 w-9 items-center justify-center rounded-md bg-base-200"><Link2 size={17} /></div><div className="flex-1"><div className="text-sm font-medium capitalize">{item.op}</div><div className="text-xs text-base-content/40">{item.status === 1 ? '已绑定' : '未绑定'}</div></div>{item.status === 1 ? <button className="btn btn-ghost btn-sm text-error" onClick={() => void unbind(item)}><Unlink size={15} />解除</button> : <button className="btn btn-outline btn-sm" onClick={() => void bind(item)}><Link2 size={15} />绑定</button>}</div>)}</div> : <div className="p-8 text-center text-sm text-base-content/40">未配置第三方身份提供商</div>}
+        {bindings.length ? <div className="divide-y divide-base-200">{bindings.map((item) => <div key={item.op} className="flex items-center gap-3 px-5 py-4"><div className="flex h-9 w-9 items-center justify-center rounded-md bg-base-200"><Link2 size={17} /></div><div className="flex-1"><div className="text-sm font-medium capitalize">{providerLabels[item.op.toLowerCase()] || item.op}</div><div className="text-xs text-base-content/40">{item.status === 1 ? '已绑定' : '未绑定'}</div></div>{item.status === 1 ? <button className="btn btn-ghost btn-sm text-error" onClick={() => void unbind(item)}><Unlink size={15} />解除</button> : <button className="btn btn-outline btn-sm" onClick={() => void bind(item)}><Link2 size={15} />绑定</button>}</div>)}</div> : <div className="p-8 text-center text-sm text-base-content/40">未配置第三方身份提供商</div>}
       </div>
     </section>
   )

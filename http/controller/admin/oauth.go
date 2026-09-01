@@ -184,6 +184,10 @@ func (o *Oauth) Create(c *gin.Context) {
 		return
 	}
 	u := f.ToOauth()
+	if u.ClientSecret == "" {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError")+"Client Secret is required")
+		return
+	}
 	err := u.FormatOauthInfo()
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError")+err.Error())

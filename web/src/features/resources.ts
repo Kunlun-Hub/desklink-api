@@ -10,6 +10,8 @@ export interface ResourceField {
   options?: Array<{ label: string; value: string | number | boolean }>
   placeholder?: string
   defaultValue?: unknown
+  visibleWhen?: { key: string; values: Array<string | number | boolean> }
+  requiredOnCreate?: boolean
 }
 
 export interface ResourceColumn {
@@ -113,14 +115,20 @@ export const resources: Record<string, ResourceConfig> = {
   },
   oauth: {
     key: 'oauth', title: 'OAuth / OIDC', description: '配置第三方身份提供商和自动注册策略', listPath: '/oauth/list', createPath: '/oauth/create', updatePath: '/oauth/update', deletePath: '/oauth/delete',
-    columns: [{ key: 'op', label: '标识' }, { key: 'oauth_type', label: '类型' }, { key: 'client_id', label: 'Client ID', format: 'secret' }, { key: 'issuer', label: 'Issuer' }, { key: 'auto_register', label: '自动注册', format: 'boolean' }, { key: 'pkce_enable', label: 'PKCE', format: 'boolean' }],
+    columns: [{ key: 'op', label: '标识' }, { key: 'oauth_type', label: '类型' }, { key: 'client_id', label: 'Client ID', format: 'secret' }, { key: 'agent_id', label: 'AgentID' }, { key: 'corp_id', label: 'CorpID' }, { key: 'auto_register', label: '自动注册', format: 'boolean' }],
     fields: [
-      { key: 'oauth_type', label: '类型', kind: 'select', required: true, options: [{ label: 'OIDC', value: 'oidc' }, { label: 'GitHub', value: 'github' }, { label: 'Google', value: 'google' }, { label: 'Linux.do', value: 'linuxdo' }], defaultValue: 'oidc' },
-      { key: 'op', label: '提供商标识', placeholder: '例如 company-oidc' }, { key: 'issuer', label: 'Issuer URL' }, { key: 'scopes', label: 'Scopes', placeholder: 'openid,profile,email' },
-      { key: 'client_id', label: 'Client ID', required: true }, { key: 'client_secret', label: 'Client Secret', kind: 'password', required: true },
-      { key: 'auto_register', label: '允许自动注册', kind: 'boolean', defaultValue: false }, { key: 'pkce_enable', label: '启用 PKCE', kind: 'boolean', defaultValue: false },
-      { key: 'pkce_method', label: 'PKCE 方法', kind: 'select', options: [{ label: 'S256', value: 'S256' }, { label: 'plain', value: 'plain' }], defaultValue: 'S256' },
-    ], defaults: { oauth_type: 'oidc', scopes: 'openid,profile,email', auto_register: false, pkce_enable: false, pkce_method: 'S256' },
+      { key: 'oauth_type', label: '类型', kind: 'select', required: true, options: [{ label: 'OIDC', value: 'oidc' }, { label: '钉钉', value: 'dingtalk' }, { label: '企业微信', value: 'wecom' }, { label: 'GitHub', value: 'github' }, { label: 'Google', value: 'google' }, { label: 'Linux.do', value: 'linuxdo' }], defaultValue: 'oidc' },
+      { key: 'op', label: '提供商标识', placeholder: '例如 company-oidc', visibleWhen: { key: 'oauth_type', values: ['oidc'] } },
+      { key: 'issuer', label: 'Issuer URL', required: true, visibleWhen: { key: 'oauth_type', values: ['oidc'] } },
+      { key: 'scopes', label: 'Scopes', placeholder: 'openid,profile,email', visibleWhen: { key: 'oauth_type', values: ['oidc', 'dingtalk'] } },
+      { key: 'client_id', label: 'Client ID / AppKey / CorpID', required: true },
+      { key: 'client_secret', label: 'Client Secret / AppSecret', kind: 'password', requiredOnCreate: true, placeholder: '编辑时留空则保持原值' },
+      { key: 'agent_id', label: 'AgentID', required: true, placeholder: '企业微信自建应用 AgentID', visibleWhen: { key: 'oauth_type', values: ['wecom'] } },
+      { key: 'corp_id', label: 'CorpID', placeholder: '可选，用于限制钉钉企业', visibleWhen: { key: 'oauth_type', values: ['dingtalk'] } },
+      { key: 'auto_register', label: '允许自动注册', kind: 'boolean', defaultValue: false },
+      { key: 'pkce_enable', label: '启用 PKCE', kind: 'boolean', defaultValue: false, visibleWhen: { key: 'oauth_type', values: ['oidc', 'google'] } },
+      { key: 'pkce_method', label: 'PKCE 方法', kind: 'select', options: [{ label: 'S256', value: 'S256' }, { label: 'plain', value: 'plain' }], defaultValue: 'S256', visibleWhen: { key: 'oauth_type', values: ['oidc', 'google'] } },
+    ], defaults: { oauth_type: 'oidc', scopes: '', auto_register: false, pkce_enable: false, pkce_method: 'S256' },
   },
   myDevices: {
     key: 'my-devices', title: '我的设备', description: '当前账号绑定和最近上报的设备', listPath: '/my/peer/list', readOnly: true,

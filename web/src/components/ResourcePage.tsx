@@ -34,7 +34,7 @@ function Cell({ column, value }: { column: ResourceColumn; value: unknown }) {
   return <span className="max-w-[260px] truncate" title={String(value ?? '')}>{value === null || value === undefined || value === '' ? '—' : String(value)}</span>
 }
 
-function FormField({ field, value, onChange }: { field: ResourceField; value: unknown; onChange: (value: unknown) => void }) {
+function FormField({ field, value, onChange, required }: { field: ResourceField; value: unknown; onChange: (value: unknown) => void; required: boolean }) {
   if (field.kind === 'boolean') {
     return (
       <label className="desklink-field">
@@ -53,7 +53,7 @@ function FormField({ field, value, onChange }: { field: ResourceField; value: un
         <select className="select select-bordered select-sm w-full" value={String(value ?? '')} onChange={(event) => {
           const option = field.options?.find((item) => String(item.value) === event.target.value)
           onChange(option?.value ?? event.target.value)
-        }} required={field.required}>
+        }} required={required}>
           {field.options?.map((option) => <option key={String(option.value)} value={String(option.value)}>{option.label}</option>)}
         </select>
       </label>
@@ -62,8 +62,8 @@ function FormField({ field, value, onChange }: { field: ResourceField; value: un
   const display = field.kind === 'tags' && Array.isArray(value) ? value.join(', ') : String(value ?? '')
   return (
     <label className="desklink-field">
-      <span className="label text-xs text-base-content/60">{field.label}{field.required && <span className="ml-1 text-error">*</span>}</span>
-      <input type={field.kind === 'number' ? 'number' : field.kind === 'password' ? 'password' : 'text'} className="input input-bordered input-sm w-full" value={display} placeholder={field.placeholder} required={field.required} onChange={(event) => {
+      <span className="label text-xs text-base-content/60">{field.label}{required && <span className="ml-1 text-error">*</span>}</span>
+      <input type={field.kind === 'number' ? 'number' : field.kind === 'password' ? 'password' : 'text'} className="input input-bordered input-sm w-full" value={display} placeholder={field.placeholder} required={required} onChange={(event) => {
         if (field.kind === 'number') onChange(event.target.value === '' ? 0 : Number(event.target.value))
         else if (field.kind === 'tags') onChange(event.target.value.split(',').map((item) => item.trim()).filter(Boolean))
         else onChange(event.target.value)
@@ -130,7 +130,11 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
     } catch (error) { show(errorMessage(error), 'error') }
   }
 
-  const visibleFields = useMemo(() => config.fields?.filter((field) => editing ? !field.createOnly : !field.editOnly) || [], [config.fields, editing])
+  const visibleFields = useMemo(() => config.fields?.filter((field) => {
+    if (editing ? field.createOnly : field.editOnly) return false
+    if (!field.visibleWhen) return true
+    return field.visibleWhen.values.some((value) => String(value) === String(form[field.visibleWhen!.key]))
+  }) || [], [config.fields, editing, form])
   const modalResourceName = config.title.endsWith('管理') ? config.title.slice(0, -2) : config.title
 
   return (
@@ -198,7 +202,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
             </div>
             <form onSubmit={(event) => void save(event)}>
               <div className="grid max-h-[65vh] grid-cols-1 gap-4 overflow-y-auto p-5 sm:grid-cols-2">
-                {visibleFields.map((field) => <FormField key={field.key} field={field} value={form[field.key]} onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))} />)}
+                {visibleFields.map((field) => <FormField key={field.key} field={field} value={form[field.key]} required={Boolean(field.required || (!editing && field.requiredOnCreate))} onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))} />)}
               </div>
               <div className="flex justify-end gap-2 border-t border-base-300 bg-base-200/40 px-5 py-4">
                 <button type="button" className="btn btn-sm desklink-action btn-ghost px-4" onClick={() => setEditing(undefined)}>取消</button>

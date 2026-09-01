@@ -82,6 +82,7 @@ Basic implementation of the PC client's primary interfaces.Supports the Personal
 
 * Admin panel URL: `http://<your server[:port]>/_admin/`
 * For the initial installation, the admin username is `admin`, and the password will be printed in the console. You can change the password via the [command line](#CLI).
+* DingTalk and WeCom setup is documented in [China enterprise OAuth setup](docs/china-oauth.md).
 
   ![img.png](./docs/init_admin_pwd.png)
 
