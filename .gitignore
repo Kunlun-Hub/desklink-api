@@ -6,3 +6,7 @@ go.sum
 resources/admin
 release
 data/rustdeskapi.db
+web/node_modules/
+web/test-results/
+web/playwright-report/
+web/*.tsbuildinfo

@@ -7,6 +7,7 @@ import (
 	apiResp "github.com/lejianwen/rustdesk-api/v2/http/response/api"
 	"github.com/lejianwen/rustdesk-api/v2/model"
 	"github.com/lejianwen/rustdesk-api/v2/service"
+	"gorm.io/gorm"
 	"net/http"
 )
 
@@ -42,7 +43,12 @@ func (g *Group) Users(c *gin.Context) {
 		userList.Users = append(userList.Users, u)
 		userList.Total = 1
 	} else {
-		userList = service.AllService.UserService.ListByGroupId(u.GroupId, q.Page, q.PageSize)
+		userList = service.AllService.UserService.List(q.PageNumber(), q.Limit(), func(tx *gorm.DB) {
+			tx.Where("group_id = ?", u.GroupId)
+			if q.Status == 1 {
+				tx.Where("status = ?", model.COMMON_STATUS_ENABLE)
+			}
+		})
 	}
 
 	data := make([]*apiResp.UserPayload, 0, len(userList.Users))
@@ -86,6 +92,15 @@ func (g *Group) Peers(c *gin.Context) {
 		users = append(users, u)
 	} else {
 		users = service.AllService.UserService.ListIdAndNameByGroupId(u.GroupId)
+		if q.Status == 1 {
+			enabled := users[:0]
+			for _, user := range users {
+				if user.Status == model.COMMON_STATUS_ENABLE {
+					enabled = append(enabled, user)
+				}
+			}
+			users = enabled
+		}
 	}
 
 	namesById := make(map[uint]string, len(users))
@@ -99,7 +114,7 @@ func (g *Group) Peers(c *gin.Context) {
 	for _, group := range allGroup.DeviceGroups {
 		dGroupNameById[group.Id] = group.Name
 	}
-	peerList := service.AllService.PeerService.ListByUserIds(userIds, q.Page, q.PageSize)
+	peerList := service.AllService.PeerService.ListByUserIds(userIds, q.PageNumber(), q.Limit())
 	data := make([]*apiResp.GroupPeerPayload, 0, len(peerList.Peers))
 	for _, peer := range peerList.Peers {
 		uname, ok := namesById[peer.UserId]
@@ -141,10 +156,15 @@ func (g *Group) Device(c *gin.Context) {
 		response.Error(c, "Permission denied")
 		return
 	}
-	allGroup := service.AllService.GroupService.DeviceGroupList(1, 999, nil)
+	q := &apiReq.ClientPageQuery{}
+	if err := c.ShouldBindQuery(q); err != nil {
+		response.Error(c, err.Error())
+		return
+	}
+	allGroup := service.AllService.GroupService.DeviceGroupList(q.PageNumber(), q.Limit(), nil)
 
 	c.JSON(http.StatusOK, response.DataResponse{
-		Total: 0,
+		Total: uint(allGroup.Total),
 		Data:  allGroup.DeviceGroups,
 	})
 }

@@ -27,3 +27,5 @@ release/
 bin/
 *.exe
 *.out
+web/node_modules/
+resources/admin/

@@ -1,8 +1,8 @@
-# RustDesk API
+# DeskLink Community API
 
 [English Doc](README_EN.md)
 
-本项目使用 Go 实现了 RustDesk 的 API，并包含了 Web Admin 和 Web 客户端。
+DeskLink 社区服务端使用 Go 实现 RustDesk 兼容 API，并包含 React 管理端和 Web 客户端。项目基于 `lejianwen/rustdesk-api` 改造。
 
 
 <div align=center>
@@ -82,7 +82,7 @@
 
 ### Web Admin:
 
-* 使用前后端分离，提供用户友好的管理界面，主要用来管理和展示。前端代码在[rustdesk-api-web](https://github.com/lejianwen/rustdesk-api-web)
+* 管理前端源码位于仓库内的 `web/`，使用 Vite、React、TypeScript、Tailwind CSS 和 daisyUI 构建。
 
 * 后台访问地址是`http://<your server>[:port]/_admin/`
 * 初次安装管理员为用户名为`admin`，密码将在控制台打印，可以通过[命令行](#CLI)更改密码
@@ -172,7 +172,7 @@
 | RUSTDESK_API_APP_CAPTCHA_THRESHOLD                     | 验证码触发次数; -1 不启用， 0 一直启用， >0 登录错误次数后启用 ;默认 `3`                                  | `3`                          |
 | RUSTDESK_API_APP_BAN_THRESHOLD                         | 封禁IP触发次数; 0 不启用, >0 登录错误次数后封禁IP; 默认 `0`                                        | `0`                          |
 | -----ADMIN配置-----                                      | ----------                                                                     | ----------                   |
-| RUSTDESK_API_ADMIN_TITLE                               | 后台标题                                                                           | `RustDesk Api Admin`         |
+| RUSTDESK_API_ADMIN_TITLE                               | 后台标题                                                                           | `DeskLink 管理中心`          |
 | RUSTDESK_API_ADMIN_HELLO                               | 后台欢迎语，可以使用`html`                                                               |                              |
 | RUSTDESK_API_ADMIN_HELLO_FILE                          | 后台欢迎语文件，如果内容多，使用文件更方便。<br>会覆盖`RUSTDESK_API_ADMIN_HELLO`                        | `./conf/admin/hello.html`    |
 | -----GIN配置-----                                        | ----------                                                                     | ----------                   |
@@ -244,15 +244,12 @@
     go install github.com/swaggo/swag/cmd/swag@latest
     ```
 
-3. 编译后台前端，前端代码在[rustdesk-api-web](https://github.com/lejianwen/rustdesk-api-web)中
+3. 编译管理前端
    ```bash
-   cd resources
-   mkdir -p admin
-   git clone https://github.com/lejianwen/rustdesk-api-web
-   cd rustdesk-api-web
-   npm install
+   cd web
+   npm ci
    npm run build
-   cp -ar dist/* ../admin/
+   cd ..
    ```
 4. 运行
     ```bash

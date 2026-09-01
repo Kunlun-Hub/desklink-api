@@ -11,7 +11,7 @@ app:
   disable-pwd-login: false #禁用密码登录
 
 admin:
-  title: "RustDesk API Admin"
+  title: "DeskLink 管理中心"
   hello-file: "./conf/admin/hello.html"  #优先使用file
   hello: ""
   # ID Server and Relay Server ports https://github.com/lejianwen/rustdesk-api/issues/257

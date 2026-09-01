@@ -388,7 +388,7 @@ func (a *Ab) Settings(c *gin.Context) {
 // @Security BearerAuth
 func (a *Ab) SharedProfiles(c *gin.Context) {
 
-	var res []*api.SharedProfilesPayload
+	res := make([]*api.SharedProfilesPayload, 0)
 
 	user := service.AllService.UserService.CurUser(c)
 	myAbCollectionList := service.AllService.AddressBookService.ListCollectionByUserId(user.Id)
@@ -440,10 +440,21 @@ func (a *Ab) SharedProfiles(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"total": 0, //len(res),
-		"data":  res,
-	})
+	q := &requstform.ClientPageQuery{}
+	if err := c.ShouldBindQuery(q); err != nil {
+		response.Error(c, response.TranslateMsg(c, "ParamsError")+err.Error())
+		return
+	}
+	total := len(res)
+	start := int((q.PageNumber() - 1) * q.Limit())
+	end := start + int(q.Limit())
+	if start > total {
+		start = total
+	}
+	if end > total {
+		end = total
+	}
+	c.JSON(http.StatusOK, gin.H{"total": total, "data": res[start:end]})
 }
 
 // ParseGuid
@@ -535,6 +546,11 @@ func (a *Ab) CheckGuid(cu *model.User, guid string) (gid, uid, cid uint, err err
 // @Security BearerAuth
 func (a *Ab) Peers(c *gin.Context) {
 	u := service.AllService.UserService.CurUser(c)
+	q := &requstform.ClientPageQuery{}
+	if err := c.ShouldBindQuery(q); err != nil {
+		response.Error(c, response.TranslateMsg(c, "ParamsError")+err.Error())
+		return
+	}
 	guid := c.Query("ab")
 	_, uid, cid, err := a.CheckGuid(u, guid)
 	if err != nil {
@@ -548,7 +564,7 @@ func (a *Ab) Peers(c *gin.Context) {
 		return
 	}
 
-	al := service.AllService.AddressBookService.ListByUserIdAndCollectionId(uid, cid, 1, 1000)
+	al := service.AllService.AddressBookService.ListByUserIdAndCollectionId(uid, cid, q.PageNumber(), q.Limit())
 	c.JSON(http.StatusOK, gin.H{
 		"total":            al.Total,
 		"data":             al.AddressBooks,

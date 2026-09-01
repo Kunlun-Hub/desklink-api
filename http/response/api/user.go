@@ -19,19 +19,27 @@ UserStatus status;
 bool isAdmin = false;
 */
 type UserPayload struct {
-	Name    string                 `json:"name"`
-	Email   string                 `json:"email"`
-	Note    string                 `json:"note"`
-	IsAdmin *bool                  `json:"is_admin"`
-	Status  int                    `json:"status"`
-	Info    map[string]interface{} `json:"info"`
+	Name        string                 `json:"name"`
+	DisplayName string                 `json:"display_name"`
+	Avatar      string                 `json:"avatar"`
+	Email       string                 `json:"email"`
+	Note        string                 `json:"note"`
+	IsAdmin     *bool                  `json:"is_admin"`
+	Status      int                    `json:"status"`
+	Info        map[string]interface{} `json:"info"`
 }
 
 func (up *UserPayload) FromUser(user *model.User) *UserPayload {
 	up.Name = user.Username
+	up.DisplayName = user.Nickname
+	up.Avatar = user.Avatar
 	up.Email = user.Email
 	up.IsAdmin = user.IsAdmin
-	up.Status = int(user.Status)
+	if user.Status == model.COMMON_STATUS_DISABLED {
+		up.Status = 0
+	} else {
+		up.Status = 1
+	}
 	up.Info = map[string]interface{}{}
 	return up
 }

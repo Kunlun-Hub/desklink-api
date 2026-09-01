@@ -1,6 +1,6 @@
-# RustDesk API
+# DeskLink Community API
 
-This project implements the RustDesk API using Go, and includes both a web UI and web client. RustDesk is a remote
+DeskLink Community API implements a RustDesk-compatible API in Go and includes a React admin UI and web client. It is based on `lejianwen/rustdesk-api`. RustDesk is a remote
 desktop software that provides self-hosted solutions.
 
 <div align=center>
@@ -78,8 +78,7 @@ Basic implementation of the PC client's primary interfaces.Supports the Personal
 
 ### Web Admin
 
-* The frontend and backend are separated to provide a user-friendly management interface, primarily for managing and
-displaying data.Frontend code is available at [rustdesk-api-web](https://github.com/lejianwen/rustdesk-api-web)
+* The admin frontend lives in `web/` in this repository and is built with Vite, React, TypeScript, Tailwind CSS, and daisyUI.
 
 * Admin panel URL: `http://<your server[:port]>/_admin/`
 * For the initial installation, the admin username is `admin`, and the password will be printed in the console. You can change the password via the [command line](#CLI).
@@ -170,7 +169,7 @@ The table below does not list all configurations. Please refer to the configurat
 | RUSTDESK_API_APP_CAPTCHA_THRESHOLD                     | captcha threshold; -1 disabled, 0 always enable, >0 threshold  ;default `3`                                                                         | `3`                           |
 | RUSTDESK_API_APP_BAN_THRESHOLD                         | ban ip threshold; 0 disabled, >0 threshold ; default `0`                                                                                            | `0`                           |
 | ----- ADMIN Configuration-----                         | ----------                                                                                                                                          | ----------                    |
-| RUSTDESK_API_ADMIN_TITLE                               | Admin Title                                                                                                                                         | `RustDesk Api Admin`          |
+| RUSTDESK_API_ADMIN_TITLE                               | Admin Title                                                                                                                                         | `DeskLink Admin`              |
 | RUSTDESK_API_ADMIN_HELLO                               | Admin welcome message, you can use `html`                                                                                                           |                               |
 | RUSTDESK_API_ADMIN_HELLO_FILE                          | Admin welcome message file,<br>will override `RUSTDESK_API_ADMIN_HELLO`                                                                             | `./conf/admin/hello.html`     |
 | ----- GIN Configuration -----                          | ---------------------------------------                                                                                                             | ----------------------------- |
@@ -241,16 +240,12 @@ Download the release from [release](https://github.com/lejianwen/rustdesk-api/re
     go install github.com/swaggo/swag/cmd/swag@latest
     ```
 
-3. Build the admin front-end (the front-end code is
-   in [rustdesk-api-web](https://github.com/lejianwen/rustdesk-api-web)):
+3. Build the admin frontend:
    ```bash
-   cd resources
-   mkdir -p admin
-   git clone https://github.com/lejianwen/rustdesk-api-web
-   cd rustdesk-api-web
-   npm install
+   cd web
+   npm ci
    npm run build
-   cp -ar dist/* ../admin/
+   cd ..
    ```
 
 4. Run:

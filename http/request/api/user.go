@@ -38,16 +38,37 @@ type LoginForm struct {
 	Password   string            `json:"password,omitempty" validate:"gte=4,lte=32" label:"密码"`
 }
 
+type ClientPageQuery struct {
+	Page     uint `json:"page" form:"page" label:"旧版页码"`
+	Current  uint `json:"current" form:"current" label:"页码"`
+	PageSize uint `json:"pageSize" form:"pageSize" label:"每页数量"`
+}
+
+func (q ClientPageQuery) PageNumber() uint {
+	if q.Current > 0 {
+		return q.Current
+	}
+	if q.Page > 0 {
+		return q.Page
+	}
+	return 1
+}
+
+func (q ClientPageQuery) Limit() uint {
+	if q.PageSize == 0 {
+		return 100
+	}
+	return q.PageSize
+}
+
 type UserListQuery struct {
-	Page       uint   `json:"page" form:"page" validate:"required" label:"页码"`
-	PageSize   uint   `json:"pageSize" form:"pageSize" validate:"required" label:"每页数量"`
+	ClientPageQuery
 	Status     int    `json:"status" form:"status" label:"状态"`
 	Accessible string `json:"accessible" form:"accessible"`
 }
 
 type PeerListQuery struct {
-	Page       uint   `json:"page" form:"page" validate:"required" label:"页码"`
-	PageSize   uint   `json:"pageSize" form:"pageSize" validate:"required" label:"每页数量"`
+	ClientPageQuery
 	Status     int    `json:"status" form:"status" label:"状态"`
 	Accessible string `json:"accessible" form:"accessible"`
 }

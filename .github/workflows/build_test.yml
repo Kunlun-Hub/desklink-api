@@ -23,14 +23,9 @@ on:
         description: 'Set to true to skip pushing to GHCR (default: false)'
         required: false
         default: 'false'
-      WEBCLIENT_SOURCE_LOCATION:
-        description: 'Web Client API Repository'
-        required: true
-        default: 'https://github.com/lejianwen/rustdesk-api-web'
 
 env:
   LATEST_TAG: latest
-  WEBCLIENT_SOURCE_LOCATION: ${{ github.event.inputs.WEBCLIENT_SOURCE_LOCATION || 'https://github.com/lejianwen/rustdesk-api-web' }}
   BASE_IMAGE_NAMESPACE: ${{ github.event.inputs.BASE_IMAGE_NAMESPACE || github.actor }}
   DOCKERHUB_IMAGE_NAMESPACE: ${{ github.event.inputs.DOCKERHUB_IMAGE_NAMESPACE || github.actor }}
   GHCR_IMAGE_NAMESPACE: ${{ github.event.inputs.GHCR_IMAGE_NAMESPACE || github.actor }}
@@ -52,12 +47,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: actions/checkout@v4
-        with:
-          repository: lejianwen/rustdesk-api-web
-          path: rustdesk-api-web
-          ref: master
-
       - name: Set up Go environment
         uses: actions/setup-go@v4
         with:
@@ -68,13 +57,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: build rustdesk-api-web
-        working-directory: rustdesk-api-web
+      - name: Build DeskLink React admin
+        working-directory: web
         run: |
-          npm install
+          npm ci
           npm run build
-          mkdir -p ../resources/admin/
-          cp -ar dist/* ../resources/admin/
 
       - name: tidy
         run: go mod tidy

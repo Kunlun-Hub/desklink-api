@@ -4,6 +4,19 @@ set -e
 # Automatically get the current environment's GOARCH; if not defined, use the detected system architecture
 GOARCH=${GOARCH:-$(go env GOARCH)}
 DOCS="true"
+
+# Build the repository-owned React admin frontend.
+if command -v npm > /dev/null 2>&1; then
+    (
+        cd web
+        npm ci
+        npm run build
+    )
+else
+    echo "npm is required to build the DeskLink admin frontend."
+    exit 1
+fi
+
 # Safely remove the old release directory
 rm -rf release
 

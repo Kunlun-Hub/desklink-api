@@ -25,7 +25,7 @@ type Index struct {
 func (i *Index) Index(c *gin.Context) {
 	response.Success(
 		c,
-		"Hello Gwen",
+		"DeskLink Community API",
 	)
 }
 

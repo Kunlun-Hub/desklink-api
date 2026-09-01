@@ -158,7 +158,7 @@ func (us *UserService) ListIdsByGroupId(groupId uint) (ids []uint) {
 
 // ListIdAndNameByGroupId 根据组id取用户id和用户名列表
 func (us *UserService) ListIdAndNameByGroupId(groupId uint) (res []*model.User) {
-	DB.Model(&model.User{}).Where("group_id = ?", groupId).Select("id, username").Find(&res)
+	DB.Model(&model.User{}).Where("group_id = ?", groupId).Select("id, username, status").Find(&res)
 	return res
 }
 
