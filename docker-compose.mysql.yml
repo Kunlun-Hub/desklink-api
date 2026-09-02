@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
 
   hbbs:
-    image: ${DESKLINK_SERVER_IMAGE:-ohoimager/desklink-server:1.4.9}
+    image: ${DESKLINK_SERVER_IMAGE:-ohoimager/desklink-server:1.4.9-secure-tcp}
     container_name: desklink-hbbs
     network_mode: host
     command: ["hbbs", "-r", "${DESKLINK_PUBLIC_HOST:?Set DESKLINK_PUBLIC_HOST in .env}:21117"]
@@ -45,7 +45,7 @@ services:
     restart: unless-stopped
 
   hbbr:
-    image: ${DESKLINK_SERVER_IMAGE:-ohoimager/desklink-server:1.4.9}
+    image: ${DESKLINK_SERVER_IMAGE:-ohoimager/desklink-server:1.4.9-secure-tcp}
     container_name: desklink-hbbr
     network_mode: host
     command: ["hbbr"]
@@ -62,7 +62,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: ${DESKLINK_API_IMAGE:-ohoimager/desklink-api:1.4.9}
+    image: ${DESKLINK_API_IMAGE:-ohoimager/desklink-api:1.4.9-recording-online}
     container_name: desklink-api
     network_mode: host
     depends_on:
@@ -99,7 +99,7 @@ services:
       - desklink_server_data:/server-data:ro
       - desklink_api_runtime:/app/runtime
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:21114/api/version"]
+      test: ["CMD-SHELL", "wget -Y off -q -O /dev/null http://127.0.0.1:21114/api/version"]
       interval: 10s
       timeout: 3s
       retries: 12

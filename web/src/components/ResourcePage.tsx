@@ -155,7 +155,13 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
           {config.search.map((field) => (
             <label key={field.key} className="desklink-field w-full sm:w-52">
               <span className="label text-[11px] text-base-content/55">{field.label}</span>
-              <input className="input input-bordered input-sm w-full bg-white" value={query[field.key] || ''} placeholder={field.placeholder || `输入${field.label}`} onChange={(event) => setQuery((current) => ({ ...current, [field.key]: event.target.value }))} />
+              {field.options ? (
+                <select className="select select-bordered select-sm w-full bg-white" value={query[field.key] || ''} onChange={(event) => setQuery((current) => ({ ...current, [field.key]: event.target.value }))}>
+                  {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              ) : (
+                <input className="input input-bordered input-sm w-full bg-white" value={query[field.key] || ''} placeholder={field.placeholder || `输入${field.label}`} onChange={(event) => setQuery((current) => ({ ...current, [field.key]: event.target.value }))} />
+              )}
             </label>
           ))}
           <button className="btn btn-sm desklink-action btn-neutral px-4"><Search size={15} />筛选</button>

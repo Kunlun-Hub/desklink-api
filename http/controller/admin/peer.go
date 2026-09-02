@@ -91,6 +91,7 @@ func (ct *Peer) List(c *gin.Context) {
 		return
 	}
 	res := service.AllService.PeerService.List(query.Page, query.PageSize, func(tx *gorm.DB) {
+		service.ApplyPeerOnlineFilter(tx, query.Online)
 		if query.TimeAgo > 0 {
 			lt := time.Now().Unix() - int64(query.TimeAgo)
 			tx.Where("last_online_time < ?", lt)

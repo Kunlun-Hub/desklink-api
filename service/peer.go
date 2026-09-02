@@ -3,9 +3,40 @@ package service
 import (
 	"github.com/lejianwen/rustdesk-api/v2/model"
 	"gorm.io/gorm"
+	"time"
 )
 
+const peerOnlineTimeout = 60 * time.Second
+
 type PeerService struct {
+}
+
+func peerIsOnline(lastOnlineTime, now int64) bool {
+	return lastOnlineTime > 0 && now-lastOnlineTime <= int64(peerOnlineTimeout/time.Second)
+}
+
+func ApplyPeerOnlineFilter(tx *gorm.DB, online string) {
+	cutoff := time.Now().Unix() - int64(peerOnlineTimeout/time.Second)
+	switch online {
+	case "true":
+		tx.Where("last_online_time >= ?", cutoff)
+	case "false":
+		tx.Where("last_online_time < ?", cutoff)
+	}
+}
+
+func (ps *PeerService) OnlineStatesByIds(ids []string) map[string]bool {
+	states := make(map[string]bool, len(ids))
+	if len(ids) == 0 {
+		return states
+	}
+	var peers []*model.Peer
+	DB.Select("id", "last_online_time").Where("id in ?", ids).Find(&peers)
+	now := time.Now().Unix()
+	for _, peer := range peers {
+		states[peer.Id] = peerIsOnline(peer.LastOnlineTime, now)
+	}
+	return states
 }
 
 // FindById 根据id查找
@@ -74,6 +105,10 @@ func (ps *PeerService) ListByUserIds(userIds []uint, page, pageSize uint) (res *
 	tx.Count(&res.Total)
 	tx.Scopes(Paginate(page, pageSize))
 	tx.Find(&res.Peers)
+	now := time.Now().Unix()
+	for _, peer := range res.Peers {
+		peer.Online = peerIsOnline(peer.LastOnlineTime, now)
+	}
 	return
 }
 
@@ -88,6 +123,10 @@ func (ps *PeerService) List(page, pageSize uint, where func(tx *gorm.DB)) (res *
 	tx.Count(&res.Total)
 	tx.Scopes(Paginate(page, pageSize))
 	tx.Find(&res.Peers)
+	now := time.Now().Unix()
+	for _, peer := range res.Peers {
+		peer.Online = peerIsOnline(peer.LastOnlineTime, now)
+	}
 	return
 }
 

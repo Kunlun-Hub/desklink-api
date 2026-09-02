@@ -113,6 +113,16 @@ func (s *AddressBookService) List(page, pageSize uint, where func(tx *gorm.DB)) 
 	tx.Count(&res.Total)
 	tx.Scopes(Paginate(page, pageSize))
 	tx.Find(&res.AddressBooks)
+	ids := make([]string, 0, len(res.AddressBooks))
+	for _, addressBook := range res.AddressBooks {
+		ids = append(ids, addressBook.Id)
+	}
+	states := AllService.PeerService.OnlineStatesByIds(ids)
+	for _, addressBook := range res.AddressBooks {
+		if online, exists := states[addressBook.Id]; exists {
+			addressBook.Online = online
+		}
+	}
 	return
 }
 

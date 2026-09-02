@@ -32,5 +32,5 @@ USER desklink
 EXPOSE 21114
 VOLUME ["/app/runtime"]
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=5 \
-    CMD wget -q -O /dev/null http://127.0.0.1:21114/api/version || exit 1
+    CMD wget -Y off -q -O /dev/null http://127.0.0.1:21114/api/version || exit 1
 ENTRYPOINT ["/app/desklink-api"]

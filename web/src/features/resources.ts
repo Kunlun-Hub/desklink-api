@@ -32,7 +32,7 @@ export interface ResourceConfig {
   deleteBodyKey?: string
   columns: ResourceColumn[]
   fields?: ResourceField[]
-  search?: Array<{ key: string; label: string; placeholder?: string }>
+  search?: Array<{ key: string; label: string; placeholder?: string; options?: Array<{ label: string; value: string }> }>
   defaults?: Record<string, unknown>
   readOnly?: boolean
   pageSize?: number
@@ -61,13 +61,13 @@ export const resources: Record<string, ResourceConfig> = {
     key: 'devices', title: '设备管理', description: '查看客户端上报的设备状态和版本信息', listPath: '/peer/list', createPath: '/peer/create', updatePath: '/peer/update', deletePath: '/peer/delete', idKey: 'row_id', deleteBodyKey: 'row_id',
     columns: [
       { key: 'id', label: '设备 ID' }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' }, { key: 'os', label: '平台', format: 'platform' },
-      { key: 'username', label: '系统用户' }, { key: 'version', label: '客户端版本' }, { key: 'last_online_time', label: '最后在线', format: 'datetime' },
+      { key: 'username', label: '系统用户' }, { key: 'version', label: '客户端版本' }, { key: 'online', label: '在线状态', format: 'online' }, { key: 'last_online_time', label: '最后在线', format: 'datetime' },
     ],
     fields: [
       { key: 'id', label: '设备 ID', required: true }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' },
       { key: 'os', label: '操作系统' }, { key: 'username', label: '系统用户' }, { key: 'uuid', label: 'UUID' },
       { key: 'version', label: '客户端版本' }, { key: 'group_id', label: '设备组 ID', kind: 'number', defaultValue: 0 },
-    ], search: [{ key: 'id', label: '设备 ID' }, { key: 'hostname', label: '主机名' }, { key: 'username', label: '系统用户' }],
+    ], search: [{ key: 'id', label: '设备 ID' }, { key: 'hostname', label: '主机名' }, { key: 'username', label: '系统用户' }, { key: 'online', label: '在线状态', options: [{ label: '全部状态', value: '' }, { label: '在线', value: 'true' }, { label: '离线', value: 'false' }] }],
   },
   groups: {
     key: 'groups', title: '用户组', description: '组织用户并控制共享范围', listPath: '/group/list', createPath: '/group/create', updatePath: '/group/update', deletePath: '/group/delete',
@@ -132,7 +132,7 @@ export const resources: Record<string, ResourceConfig> = {
   },
   myDevices: {
     key: 'my-devices', title: '我的设备', description: '当前账号绑定和最近上报的设备', listPath: '/my/peer/list', readOnly: true,
-    columns: [{ key: 'id', label: '设备 ID' }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' }, { key: 'os', label: '平台', format: 'platform' }, { key: 'version', label: '版本' }, { key: 'last_online_time', label: '最后在线', format: 'datetime' }],
+    columns: [{ key: 'id', label: '设备 ID' }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' }, { key: 'os', label: '平台', format: 'platform' }, { key: 'version', label: '版本' }, { key: 'online', label: '在线状态', format: 'online' }, { key: 'last_online_time', label: '最后在线', format: 'datetime' }],
   },
   myAddressBooks: {
     key: 'my-address-books', title: '我的地址簿', description: '维护当前账号可访问的远程设备', listPath: '/my/address_book/list', createPath: '/my/address_book/create', updatePath: '/my/address_book/update', deletePath: '/my/address_book/delete', idKey: 'row_id', deleteBodyKey: 'row_id',

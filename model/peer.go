@@ -14,6 +14,7 @@ type Peer struct {
 	User           *User  `json:"user,omitempty"`
 	LastOnlineTime int64  `json:"last_online_time"  gorm:"default:0;not null;"`
 	LastOnlineIp   string `json:"last_online_ip"  gorm:"default:'';not null;"`
+	Online         bool   `json:"online" gorm:"-"`
 	GroupId        uint   `json:"group_id"  gorm:"default:0;not null;index"`
 	Alias          string `json:"alias" gorm:"default:'';not null;index"`
 	TimeModel
