@@ -126,6 +126,7 @@ https://desklink.example.com/api/oidc/callback
 | --- | --- | --- |
 | `DESKLINK_SERVER_IMAGE` | `ohoimager/desklink-server:1.4.9-secure-tcp` | ID/Relay 镜像 |
 | `DESKLINK_API_IMAGE` | `ohoimager/desklink-api:1.4.9-recording-online` | API/管理端镜像 |
+| `DESKLINK_JWT_KEY` | 无，必填 | 录像预览、下载和 API JWT 的签名密钥，生产环境使用随机长字符串 |
 
 ### 外部服务
 
