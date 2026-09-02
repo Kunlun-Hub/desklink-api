@@ -73,6 +73,15 @@ func ApiInit(g *gin.Engine) {
 		//[method:POST] [uri:/api/audit/file]
 		frg.POST("/audit/file", au.AuditFile)
 	}
+	{
+		recording := &api.Recording{}
+		frg.GET("/recording-policy", recording.Policy)
+		frg.POST("/recordings/init", recording.Init)
+		frg.PUT("/recordings/:upload_id/chunks", recording.Chunk)
+		frg.POST("/recordings/:upload_id/complete", recording.Complete)
+		frg.DELETE("/recordings/:upload_id", recording.Cancel)
+		frg.GET("/recordings/:id/content", recording.Content)
+	}
 
 	frg.Use(middleware.RustAuth())
 	{

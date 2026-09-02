@@ -160,6 +160,23 @@ https://desklink.example.com/api/oidc/callback
 | `DESKLINK_SHOW_SWAGGER` | `0` | 是否显示 Swagger |
 | `DESKLINK_WEB_CLIENT` | `1` | 是否启用 Web Client |
 | `DESKLINK_PERSONAL_ADDRESS_BOOK` | `1` | 是否启用个人/共享地址簿 API |
+| `DESKLINK_RECORDING_MAX_CHUNK_SIZE` | `8388608` | 会话录像上传分片上限，单位字节，建议 4-8 MiB |
+
+### 会话录像
+
+管理端“安全审计 -> 会话录像”支持全局关闭、全局开启和指定设备三种策略。
+录像由被控端直接复用远控链路中的编码帧并封装，不重复采集屏幕：
+
+- VP9/AV1 保存为 WebM，H.264/H.265 保存为 MP4；
+- VP9、AV1 和 H.264 文件直接在线预览；
+- H.265 原文件保持不变，API 异步生成 H.264 预览副本；
+- 上传块使用设备 ID + 安装 UUID 校验，后续请求使用随机上传令牌；
+- 播放与下载地址由管理员登录态换取，有效期 5 分钟；
+- 录像保留天数在管理端策略中设置，后台每 6 小时执行一次清理；
+- 超过 24 小时未完成的上传会标记为失败。
+
+录像原文件和预览文件保存在 `desklink_api_runtime` Docker 卷的
+`/app/runtime/recordings` 目录。该卷应纳入备份和磁盘容量监控。
 
 其他可用参数与 `conf/config.yaml` 一一对应，环境变量格式为：
 
@@ -201,7 +218,12 @@ docker exec -i desklink-mysql sh -c \
   < desklink-2026-09-01.sql
 ```
 
-同时备份 `desklink_server_data` 卷，其中包含 hbbs 私钥、公钥和设备注册数据库。丢失该卷会导致服务公钥改变，客户端配置需要同步更新。
+同时备份：
+
+- `desklink_server_data`：hbbs 私钥、公钥和设备注册数据库；
+- `desklink_api_runtime`：会话录像原文件、H.265 预览副本和 API 运行数据。
+
+丢失 `desklink_server_data` 会导致服务公钥改变，客户端配置需要同步更新。
 
 ## 8. 升级
 

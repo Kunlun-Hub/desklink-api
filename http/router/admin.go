@@ -35,6 +35,7 @@ func Init(g *gin.Engine) {
 	OauthBind(adg)
 	LoginLogBind(adg)
 	AuditBind(adg)
+	RecordingBind(adg)
 	AddressBookCollectionBind(adg)
 	AddressBookCollectionRuleBind(adg)
 	UserTokenBind(adg)
@@ -52,6 +53,17 @@ func Init(g *gin.Engine) {
 	DeviceGroupBind(adg)
 	//访问静态文件
 	//g.StaticFS("/upload", http.Dir(global.Config.Gin.ResourcesPath+"/upload"))
+}
+
+func RecordingBind(rg *gin.RouterGroup) {
+	cont := &admin.Recording{}
+	r := rg.Group("/recordings").Use(middleware.AdminPrivilege())
+	r.GET("/policy", cont.Policy)
+	r.POST("/policy", cont.SavePolicy)
+	r.GET("/list", cont.List)
+	r.GET("/:id/access", cont.Access)
+	r.POST("/delete", cont.Delete)
+	r.POST("/batchDelete", cont.BatchDelete)
 }
 
 func RustdeskCmdBind(adg *gin.RouterGroup) {

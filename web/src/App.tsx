@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage'
 import ProfilePage from './pages/ProfilePage'
 import RegisterPage from './pages/RegisterPage'
 import SettingsPage from './pages/SettingsPage'
+import RecordingsPage from './pages/RecordingsPage'
 
 function ProtectedLayout() {
   const { user, loading } = useAuth()
@@ -52,6 +53,7 @@ function ApplicationRoutes() {
         <Route path="admin/login-logs" element={<AdminRoute><ResourcePage config={resources.loginLogs} /></AdminRoute>} />
         <Route path="admin/connection-audit" element={<AdminRoute><ResourcePage config={resources.connectionAudit} /></AdminRoute>} />
         <Route path="admin/file-audit" element={<AdminRoute><ResourcePage config={resources.fileAudit} /></AdminRoute>} />
+        <Route path="admin/recordings" element={<AdminRoute><RecordingsPage /></AdminRoute>} />
         <Route path="admin/tokens" element={<AdminRoute><ResourcePage config={resources.tokens} /></AdminRoute>} />
         <Route path="admin/shares" element={<AdminRoute><ResourcePage config={resources.shares} /></AdminRoute>} />
         <Route path="admin/commands" element={<AdminRoute><CommandsPage /></AdminRoute>} />

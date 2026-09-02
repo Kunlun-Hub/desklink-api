@@ -94,7 +94,7 @@ func (i *Index) Heartbeat(c *gin.Context) {
 		return
 	}
 	peer := service.AllService.PeerService.FindById(info.Id)
-	if peer == nil || peer.RowId == 0 {
+	if peer == nil || peer.RowId == 0 || peer.Uuid == "" || peer.Uuid != info.Uuid {
 		c.JSON(http.StatusOK, gin.H{})
 		return
 	}
@@ -103,7 +103,17 @@ func (i *Index) Heartbeat(c *gin.Context) {
 		upp := &model.Peer{RowId: peer.RowId, LastOnlineTime: time.Now().Unix(), LastOnlineIp: c.ClientIP()}
 		service.AllService.PeerService.Update(upp)
 	}
-	c.JSON(http.StatusOK, gin.H{})
+	enabled, policyErr := service.AllService.RecordingService.IsEnabled(info.Id)
+	if policyErr != nil {
+		global.Logger.Warnf("recording policy lookup failed for %s: %v", info.Id, policyErr)
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"recording": gin.H{
+			"enabled":    enabled,
+			"forced":     enabled,
+			"chunk_size": service.AllService.RecordingService.MaxChunkSize(),
+		},
+	})
 }
 
 // Version 版本

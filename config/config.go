@@ -47,6 +47,13 @@ type Config struct {
 	Rustdesk   Rustdesk
 	Proxy      Proxy
 	Ldap       Ldap
+	Recording  Recording
+}
+
+type Recording struct {
+	Path         string `mapstructure:"path"`
+	MaxChunkSize int64  `mapstructure:"max-chunk-size"`
+	FfmpegPath   string `mapstructure:"ffmpeg-path"`
 }
 
 func (a *Admin) Init() {
