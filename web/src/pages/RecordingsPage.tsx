@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Film, Play, RefreshCw, Save, Search, Trash2, X } from 'lucide-react'
+import { Cloud, Download, Film, HardDrive, Play, RefreshCw, Save, Search, Trash2, X } from 'lucide-react'
 import { errorMessage, get, normalizePage, post, type PageData } from '../lib/api'
 import { useToast } from '../components/Toast'
 
@@ -38,6 +38,29 @@ interface Recording {
 
 interface AccessResponse { url: string; expires_at: number }
 
+type StorageBackend = 'local' | 'ftp' | 'nfs' | 'smb' | 's3'
+
+interface StorageConfig {
+  backend: StorageBackend
+  path: string
+  endpoint: string
+  bucket: string
+  region: string
+  access_key: string
+  secret_key: string
+  username: string
+  password: string
+  prefix: string
+  secure: boolean
+  has_secret_key: boolean
+  has_password: boolean
+}
+
+const emptyStorage: StorageConfig = {
+  backend: 'local', path: '', endpoint: '', bucket: '', region: '', access_key: '', secret_key: '',
+  username: '', password: '', prefix: '', secure: false, has_secret_key: false, has_password: false,
+}
+
 const modeOptions: { value: PolicyMode; label: string; description: string }[] = [
   { value: 'off', label: '全局关闭', description: '所有设备均不自动录制' },
   { value: 'all', label: '全局开启', description: '所有被控设备强制自动录制' },
@@ -70,6 +93,8 @@ export default function RecordingsPage() {
   const [records, setRecords] = useState<PageData<Recording>>(normalizePage())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [storage, setStorage] = useState<StorageConfig>(emptyStorage)
+  const [savingStorage, setSavingStorage] = useState(false)
   const [page, setPage] = useState(1)
   const [peerFilter, setPeerFilter] = useState('')
   const [fromFilter, setFromFilter] = useState('')
@@ -90,6 +115,11 @@ export default function RecordingsPage() {
     setPeers(normalizePage(value).list)
   }, [])
 
+  const loadStorage = useCallback(async () => {
+    const value = await get<StorageConfig>('/recordings/storage')
+    setStorage({ ...emptyStorage, ...value, secret_key: '', password: '' })
+  }, [])
+
   const loadRecords = useCallback(async () => {
     const value = await get<Partial<PageData<Recording>>>('/recordings/list', {
       page, page_size: 20, peer_id: peerFilter || undefined, from_peer: fromFilter || undefined,
@@ -102,10 +132,10 @@ export default function RecordingsPage() {
   }, [page, peerFilter, fromFilter, statusFilter, startedAfter, startedBefore])
 
   useEffect(() => {
-    Promise.all([loadPolicy(), loadPeers(), loadRecords()])
+    Promise.all([loadPolicy(), loadStorage(), loadPeers(), loadRecords()])
       .catch((error) => show(errorMessage(error), 'error'))
       .finally(() => setLoading(false))
-  }, [loadPolicy, loadPeers, loadRecords, show])
+  }, [loadPolicy, loadStorage, loadPeers, loadRecords, show])
 
   const visiblePeers = useMemo(() => {
     const term = deviceSearch.trim().toLowerCase()
@@ -130,6 +160,19 @@ export default function RecordingsPage() {
       show(errorMessage(error), 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const saveStorage = async () => {
+    setSavingStorage(true)
+    try {
+      const value = await post<StorageConfig>('/recordings/storage', storage)
+      setStorage({ ...emptyStorage, ...value, secret_key: '', password: '' })
+      show('录像存储配置已保存', 'success')
+    } catch (error) {
+      show(errorMessage(error), 'error')
+    } finally {
+      setSavingStorage(false)
     }
   }
 
@@ -186,6 +229,25 @@ export default function RecordingsPage() {
           ))}
         </div>
         <label className="mt-4 flex max-w-xs items-center gap-3 text-sm"><span className="whitespace-nowrap text-base-content/60">保留天数</span><input type="number" min={1} max={3650} className="input input-bordered input-sm w-28" value={policy.retention_days} onChange={(event) => setPolicy((value) => ({ ...value, retention_days: Number(event.target.value) }))} /></label>
+      </div>
+
+      <div className="desklink-card overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 border-b border-base-300 px-5 py-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-sky-50 text-sky-600">{storage.backend === 'local' ? <HardDrive size={18} /> : <Cloud size={18} />}</div>
+          <div className="mr-auto"><div className="text-sm font-semibold">录像存储</div><div className="text-xs uppercase text-base-content/40">{storage.backend}</div></div>
+          <button className="btn btn-sm border-0 bg-emerald-600 px-4 text-white hover:bg-emerald-700" onClick={() => void saveStorage()} disabled={savingStorage}>
+            {savingStorage ? <span className="loading loading-spinner loading-xs" /> : <Save size={15} />}保存存储
+          </button>
+        </div>
+        <div className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-3">
+          <label className="desklink-field"><span className="label text-xs text-base-content/60">存储类型</span><select className="select select-bordered select-sm w-full" value={storage.backend} onChange={(event) => setStorage((value) => ({ ...value, backend: event.target.value as StorageBackend }))}><option value="local">本地存储</option><option value="ftp">FTP</option><option value="nfs">NFS</option><option value="smb">SMB</option><option value="s3">S3 兼容存储</option></select></label>
+          {(storage.backend === 'local' || storage.backend === 'nfs' || storage.backend === 'smb') && <label className="desklink-field sm:col-span-2"><span className="label text-xs text-base-content/60">{storage.backend === 'local' ? '存储路径' : '挂载路径'}</span><input className="input input-bordered input-sm w-full font-mono" value={storage.path} onChange={(event) => setStorage((value) => ({ ...value, path: event.target.value }))} /></label>}
+          {(storage.backend === 'ftp' || storage.backend === 's3') && <label className="desklink-field"><span className="label text-xs text-base-content/60">服务端点</span><input className="input input-bordered input-sm w-full font-mono" placeholder={storage.backend === 'ftp' ? 'ftp.example.com:21' : 's3.example.com'} value={storage.endpoint} onChange={(event) => setStorage((value) => ({ ...value, endpoint: event.target.value }))} /></label>}
+          {storage.backend === 'ftp' && <><label className="desklink-field"><span className="label text-xs text-base-content/60">用户名</span><input className="input input-bordered input-sm w-full" value={storage.username} onChange={(event) => setStorage((value) => ({ ...value, username: event.target.value }))} /></label><label className="desklink-field"><span className="label text-xs text-base-content/60">密码</span><input type="password" className="input input-bordered input-sm w-full" placeholder={storage.has_password ? '已配置，留空保持不变' : ''} value={storage.password} onChange={(event) => setStorage((value) => ({ ...value, password: event.target.value }))} /></label></>}
+          {storage.backend === 's3' && <><label className="desklink-field"><span className="label text-xs text-base-content/60">Bucket</span><input className="input input-bordered input-sm w-full" value={storage.bucket} onChange={(event) => setStorage((value) => ({ ...value, bucket: event.target.value }))} /></label><label className="desklink-field"><span className="label text-xs text-base-content/60">Region</span><input className="input input-bordered input-sm w-full" value={storage.region} onChange={(event) => setStorage((value) => ({ ...value, region: event.target.value }))} /></label><label className="desklink-field"><span className="label text-xs text-base-content/60">Access Key</span><input className="input input-bordered input-sm w-full" value={storage.access_key} onChange={(event) => setStorage((value) => ({ ...value, access_key: event.target.value }))} /></label><label className="desklink-field"><span className="label text-xs text-base-content/60">Secret Key</span><input type="password" className="input input-bordered input-sm w-full" placeholder={storage.has_secret_key ? '已配置，留空保持不变' : ''} value={storage.secret_key} onChange={(event) => setStorage((value) => ({ ...value, secret_key: event.target.value }))} /></label></>}
+          {(storage.backend === 'ftp' || storage.backend === 's3' || storage.backend === 'nfs' || storage.backend === 'smb') && <label className="desklink-field"><span className="label text-xs text-base-content/60">目录前缀</span><input className="input input-bordered input-sm w-full" value={storage.prefix} onChange={(event) => setStorage((value) => ({ ...value, prefix: event.target.value }))} /></label>}
+          {(storage.backend === 'ftp' || storage.backend === 's3') && <label className="desklink-field"><span className="label text-xs text-base-content/60">加密连接</span><span className="flex h-9 items-center justify-between rounded-md border border-base-300 px-3"><span className="text-xs text-base-content/50">TLS</span><input type="checkbox" className="toggle toggle-success toggle-sm" checked={storage.secure} onChange={(event) => setStorage((value) => ({ ...value, secure: event.target.checked }))} /></span></label>}
+        </div>
       </div>
 
       {policy.mode === 'selected' && (

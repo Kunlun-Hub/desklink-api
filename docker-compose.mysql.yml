@@ -99,6 +99,7 @@ services:
     volumes:
       - desklink_server_data:/server-data:ro
       - desklink_api_runtime:/app/runtime
+      - ${DESKLINK_RECORDING_MOUNT_PATH:-/opt/desklink/recordings-external}:/recordings-external
     healthcheck:
       test: ["CMD-SHELL", "wget -Y off -q -O /dev/null http://127.0.0.1:21114/api/version"]
       interval: 10s

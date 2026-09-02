@@ -136,11 +136,16 @@ func (r *Recording) Content(c *gin.Context) {
 		c.Header("Content-Disposition", "attachment; filename=\""+strings.ReplaceAll(recording.OriginalName, "\"", "")+"\"")
 	}
 	contentType := map[string]string{"webm": "video/webm", "mp4": "video/mp4"}[recording.Container]
-	path := service.AllService.RecordingService.FilePath(recording)
-	if c.Query("download") != "1" && recording.PreviewStorageName != "" {
+	preview := c.Query("download") != "1" && recording.PreviewStorageName != ""
+	if preview {
 		contentType = "video/mp4"
-		path = service.AllService.RecordingService.PreviewFilePath(recording)
 	}
+	path, cleanup, err := service.AllService.RecordingService.MaterializeRecordingObject(recording, preview)
+	if err != nil {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	defer cleanup()
 	c.Header("Content-Type", contentType)
 	c.File(path)
 }

@@ -162,6 +162,7 @@ https://desklink.example.com/api/oidc/callback
 | `DESKLINK_WEB_CLIENT` | `1` | 是否启用 Web Client |
 | `DESKLINK_PERSONAL_ADDRESS_BOOK` | `1` | 是否启用个人/共享地址簿 API |
 | `DESKLINK_RECORDING_MAX_CHUNK_SIZE` | `8388608` | 会话录像上传分片上限，单位字节，建议 4-8 MiB |
+| `DESKLINK_RECORDING_MOUNT_PATH` | `/opt/desklink/recordings-external` | 宿主机已挂载的 NFS/SMB 目录，映射到容器 `/recordings-external` |
 
 ### 会话录像
 
@@ -176,8 +177,15 @@ https://desklink.example.com/api/oidc/callback
 - 录像保留天数在管理端策略中设置，后台每 6 小时执行一次清理；
 - 超过 24 小时未完成的上传会标记为失败。
 
-录像原文件和预览文件保存在 `desklink_api_runtime` Docker 卷的
-`/app/runtime/recordings` 目录。该卷应纳入备份和磁盘容量监控。
+管理端可将完成的录像归档到本地目录、FTP、S3 兼容对象存储，或宿主机已挂载的
+NFS/SMB 目录。分片上传和 H.265 转码始终先在
+`desklink_api_runtime:/app/runtime/recordings` 暂存，完成校验后再归档。FTP/S3
+凭据使用 `DESKLINK_JWT_KEY` 派生的 AES-GCM 密钥加密后写入数据库。
+
+NFS/SMB 不由 API 容器执行系统挂载。先在宿主机挂载共享目录，并设置
+`DESKLINK_RECORDING_MOUNT_PATH`；管理端配置中的路径使用容器内的
+`/recordings-external`。每条录像绑定创建时的存储配置版本，后续切换 Bucket、目录
+或协议只影响新录像。暂存卷和外部存储都应纳入备份与容量监控。
 
 其他可用参数与 `conf/config.yaml` 一一对应，环境变量格式为：
 
@@ -222,7 +230,7 @@ docker exec -i desklink-mysql sh -c \
 同时备份：
 
 - `desklink_server_data`：hbbs 私钥、公钥和设备注册数据库；
-- `desklink_api_runtime`：会话录像原文件、H.265 预览副本和 API 运行数据。
+- `desklink_api_runtime`：录像暂存文件、本地录像和 API 运行数据；外部录像存储需单独备份。
 
 丢失 `desklink_server_data` 会导致服务公钥改变，客户端配置需要同步更新。
 

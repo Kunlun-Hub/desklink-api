@@ -202,6 +202,10 @@ func (s *RecordingService) InitUpload(in *RecordingInit) (*model.SessionRecordin
 		}
 	}
 	storageName := uploadId + "." + container
+	storageSettingId, storageConfig, err := s.activeStorageConfig()
+	if err != nil {
+		return nil, "", err
+	}
 	if err = os.MkdirAll(s.storagePath(), 0750); err != nil {
 		return nil, "", err
 	}
@@ -219,7 +223,8 @@ func (s *RecordingService) InitUpload(in *RecordingInit) (*model.SessionRecordin
 	recording := &model.SessionRecording{
 		UploadId: uploadId, UploadTokenHash: tokenHash(token), PeerId: in.PeerId,
 		FromPeer: in.FromPeer, FromName: in.FromName, SessionId: in.SessionId, OriginalName: name,
-		StorageName: storageName, Container: container, Codec: strings.ToLower(in.Codec),
+		StorageName: storageName, StorageBackend: storageConfig.Backend, StorageSettingId: storageSettingId,
+		Container: container, Codec: strings.ToLower(in.Codec),
 		Status: model.RecordingStatusUploading, StartedAt: startedAt,
 	}
 	if err = DB.Create(recording).Error; err != nil {
@@ -305,6 +310,9 @@ func (s *RecordingService) Complete(recording *model.SessionRecording, durationM
 	if recording.Codec == "h265" || recording.Codec == "hevc" {
 		status = model.RecordingStatusTranscoding
 	}
+	if err = s.archiveRecordingObject(recording, recording.StorageName, path); err != nil {
+		return fmt.Errorf("archive recording: %w", err)
+	}
 	if err = DB.Model(recording).Updates(map[string]interface{}{
 		"status": status, "size": info.Size(), "duration_ms": durationMs,
 		"completed_at": time.Now().Unix(), "sha256": hash,
@@ -313,6 +321,8 @@ func (s *RecordingService) Complete(recording *model.SessionRecording, durationM
 	}
 	if status == model.RecordingStatusTranscoding {
 		go s.TranscodePreview(recording.Id)
+	} else {
+		s.removeStagedRecordingObject(recording, recording.StorageName)
 	}
 	return nil
 }
@@ -332,10 +342,22 @@ func (s *RecordingService) TranscodePreview(id uint) {
 	}
 	previewName := recording.UploadId + ".preview.mp4"
 	previewPath := filepath.Join(s.storagePath(), previewName)
+	originalPath := s.FilePath(recording)
+	originalCleanup := func() {}
+	if _, statErr := os.Stat(originalPath); errors.Is(statErr, os.ErrNotExist) {
+		originalPath, originalCleanup, err = s.MaterializeRecordingObject(recording, false)
+		if err != nil {
+			_ = DB.Model(recording).Updates(map[string]interface{}{
+				"status": model.RecordingStatusFailed, "error_message": "preview source unavailable: " + err.Error(),
+			}).Error
+			return
+		}
+	}
+	defer originalCleanup()
 	ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, s.ffmpegPath(), "-hide_banner", "-loglevel", "error", "-y",
-		"-i", s.FilePath(recording), "-map", "0:v:0", "-an", "-c:v", "libx264",
+		"-i", originalPath, "-map", "0:v:0", "-an", "-c:v", "libx264",
 		"-preset", "veryfast", "-crf", "28", "-movflags", "+faststart", previewPath)
 	output, runErr := cmd.CombinedOutput()
 	if runErr != nil {
@@ -350,6 +372,13 @@ func (s *RecordingService) TranscodePreview(id uint) {
 		_ = DB.Model(recording).Updates(map[string]interface{}{
 			"status": model.RecordingStatusFailed, "error_message": "preview transcoding failed: " + message,
 		}).Error
+		s.removeStagedRecordingObject(recording, recording.StorageName)
+		return
+	}
+	if err = s.archiveRecordingObject(recording, previewName, previewPath); err != nil {
+		_ = DB.Model(recording).Updates(map[string]interface{}{
+			"status": model.RecordingStatusFailed, "error_message": "preview archive failed: " + err.Error(),
+		}).Error
 		return
 	}
 	result := DB.Model(recording).Where("status = ?", model.RecordingStatusTranscoding).Updates(map[string]interface{}{
@@ -357,7 +386,10 @@ func (s *RecordingService) TranscodePreview(id uint) {
 	})
 	if result.Error != nil || result.RowsAffected == 0 {
 		_ = os.Remove(previewPath)
+		return
 	}
+	s.removeStagedRecordingObject(recording, recording.StorageName)
+	s.removeStagedRecordingObject(recording, previewName)
 }
 
 func (s *RecordingService) List(page, pageSize uint, peerId, fromPeer, status string, startedAfter, startedBefore int64) *model.SessionRecordingList {
@@ -402,13 +434,15 @@ func (s *RecordingService) PreviewFilePath(recording *model.SessionRecording) st
 }
 
 func (s *RecordingService) Delete(recording *model.SessionRecording) error {
-	if err := os.Remove(s.FilePath(recording)); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := s.deleteRecordingObject(recording, recording.StorageName); err != nil {
 		return err
 	}
+	_ = os.Remove(s.FilePath(recording))
 	if recording.PreviewStorageName != "" {
-		if err := os.Remove(s.PreviewFilePath(recording)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := s.deleteRecordingObject(recording, recording.PreviewStorageName); err != nil {
 			return err
 		}
+		_ = os.Remove(s.PreviewFilePath(recording))
 	}
 	return DB.Delete(recording).Error
 }

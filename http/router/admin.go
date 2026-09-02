@@ -60,6 +60,8 @@ func RecordingBind(rg *gin.RouterGroup) {
 	r := rg.Group("/recordings").Use(middleware.AdminPrivilege())
 	r.GET("/policy", cont.Policy)
 	r.POST("/policy", cont.SavePolicy)
+	r.GET("/storage", cont.Storage)
+	r.POST("/storage", cont.SaveStorage)
 	r.GET("/list", cont.List)
 	r.GET("/:id/access", cont.Access)
 	r.POST("/delete", cont.Delete)

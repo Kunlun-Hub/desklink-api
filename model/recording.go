@@ -34,6 +34,8 @@ type SessionRecording struct {
 	SessionId          string `gorm:"size:128;index;default:'';not null" json:"session_id"`
 	OriginalName       string `gorm:"size:255;not null" json:"original_name"`
 	StorageName        string `gorm:"size:255;uniqueIndex;not null" json:"-"`
+	StorageBackend     string `gorm:"size:16;default:'local';not null;index" json:"storage_backend"`
+	StorageSettingId   uint   `gorm:"default:0;not null;index" json:"-"`
 	PreviewStorageName string `gorm:"size:255;default:'';not null" json:"-"`
 	Container          string `gorm:"size:16;not null" json:"container"`
 	Codec              string `gorm:"size:16;default:'';not null" json:"codec"`
@@ -44,6 +46,22 @@ type SessionRecording struct {
 	CompletedAt        int64  `gorm:"default:0;not null" json:"completed_at"`
 	Sha256             string `gorm:"size:64;default:'';not null" json:"sha256"`
 	ErrorMessage       string `gorm:"size:512;default:'';not null" json:"error_message"`
+	TimeModel
+}
+
+type RecordingStorageSetting struct {
+	Id              uint   `gorm:"primaryKey" json:"id"`
+	Backend         string `gorm:"size:16;default:'local';not null;index" json:"backend"`
+	Active          bool   `gorm:"default:0;not null;index" json:"active"`
+	Path            string `gorm:"size:1024;default:'';not null" json:"path"`
+	Endpoint        string `gorm:"size:512;default:'';not null" json:"endpoint"`
+	Bucket          string `gorm:"size:255;default:'';not null" json:"bucket"`
+	Region          string `gorm:"size:128;default:'';not null" json:"region"`
+	AccessKey       string `gorm:"size:255;default:'';not null" json:"access_key"`
+	Username        string `gorm:"size:255;default:'';not null" json:"username"`
+	Prefix          string `gorm:"size:512;default:'';not null" json:"prefix"`
+	Secure          bool   `gorm:"default:0;not null" json:"secure"`
+	EncryptedSecret string `gorm:"type:text" json:"-"`
 	TimeModel
 }
 

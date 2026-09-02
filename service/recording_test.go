@@ -25,12 +25,16 @@ func setupRecordingTest(t *testing.T) *RecordingService {
 		t.Fatal(err)
 	}
 	if err = db.AutoMigrate(
-		&model.Peer{}, &model.RecordingPolicy{}, &model.RecordingPolicyDevice{}, &model.SessionRecording{},
+		&model.Peer{}, &model.RecordingPolicy{}, &model.RecordingPolicyDevice{},
+		&model.SessionRecording{}, &model.RecordingStorageSetting{},
 	); err != nil {
 		t.Fatal(err)
 	}
 	DB = db
-	Config = &config.Config{Recording: config.Recording{Path: t.TempDir(), MaxChunkSize: 8 * 1024 * 1024}}
+	Config = &config.Config{
+		Jwt:       config.Jwt{Key: "recording-storage-test-key"},
+		Recording: config.Recording{Path: t.TempDir(), MaxChunkSize: 8 * 1024 * 1024},
+	}
 	Logger = logrus.New()
 	service := &RecordingService{}
 	AllService = &Service{PeerService: &PeerService{}, RecordingService: service}

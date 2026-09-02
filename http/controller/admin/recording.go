@@ -39,6 +39,29 @@ func (r *Recording) SavePolicy(c *gin.Context) {
 	r.Policy(c)
 }
 
+func (r *Recording) Storage(c *gin.Context) {
+	config, err := service.AllService.RecordingService.StorageConfig()
+	if err != nil {
+		response.Fail(c, 101, err.Error())
+		return
+	}
+	response.Success(c, config)
+}
+
+func (r *Recording) SaveStorage(c *gin.Context) {
+	form := &service.RecordingStorageConfig{}
+	if err := c.ShouldBindJSON(form); err != nil {
+		response.Fail(c, 101, err.Error())
+		return
+	}
+	config, err := service.AllService.RecordingService.SaveStorageConfig(*form)
+	if err != nil {
+		response.Fail(c, 101, err.Error())
+		return
+	}
+	response.Success(c, config)
+}
+
 func (r *Recording) List(c *gin.Context) {
 	page, _ := strconv.ParseUint(c.DefaultQuery("page", "1"), 10, 32)
 	pageSize, _ := strconv.ParseUint(c.DefaultQuery("page_size", "20"), 10, 32)

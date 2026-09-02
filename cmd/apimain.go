@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const DatabaseVersion = 268
+const DatabaseVersion = 269
 
 // @title 管理系统API
 // @version 1.0
@@ -318,6 +318,7 @@ func Migrate(version uint) {
 		&model.RecordingPolicy{},
 		&model.RecordingPolicyDevice{},
 		&model.SessionRecording{},
+		&model.RecordingStorageSetting{},
 	)
 	if err != nil {
 		global.Logger.Error("migrate err :=>", err)
