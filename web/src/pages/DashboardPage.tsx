@@ -10,7 +10,7 @@ interface AdminConfig { title: string; hello?: string }
 export default function DashboardPage() {
   const { user, isAdmin } = useAuth()
   const { show } = useToast()
-  const [counts, setCounts] = useState({ users: 0, devices: 0, addressBooks: 0, logs: 0 })
+  const [counts, setCounts] = useState({ users: 0, devices: 0, onlineDevices: 0, addressBooks: 0, logs: 0 })
   const [server, setServer] = useState<ServerConfig | null>(null)
   const [adminConfig, setAdminConfig] = useState<AdminConfig | null>(null)
   const [loading, setLoading] = useState(true)
@@ -20,12 +20,12 @@ export default function DashboardPage() {
       try {
         const common = [get<AdminConfig>('/config/admin'), get<ServerConfig>('/config/server')]
         const metricRequests = isAdmin
-          ? [get<PageData<unknown>>('/user/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/peer/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/address_book/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/audit_conn/list', { page: 1, page_size: 1 })]
-          : [Promise.resolve(undefined), get<PageData<unknown>>('/my/peer/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/my/address_book/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/my/login_log/list', { page: 1, page_size: 1 })]
-        const [adminResult, serverResult, users, devices, addressBooks, logs] = await Promise.all([...common, ...metricRequests])
+          ? [get<PageData<unknown>>('/user/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/peer/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/peer/list', { page: 1, page_size: 1, online: 'true' }), get<PageData<unknown>>('/address_book/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/audit_conn/list', { page: 1, page_size: 1 })]
+          : [Promise.resolve(undefined), get<PageData<unknown>>('/my/peer/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/my/peer/list', { page: 1, page_size: 1, online: 'true' }), get<PageData<unknown>>('/my/address_book/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/my/login_log/list', { page: 1, page_size: 1 })]
+        const [adminResult, serverResult, users, devices, onlineDevices, addressBooks, logs] = await Promise.all([...common, ...metricRequests])
         setAdminConfig(adminResult as AdminConfig)
         setServer(serverResult as ServerConfig)
-        setCounts({ users: normalizePage(users as PageData<unknown> | undefined).total, devices: normalizePage(devices as PageData<unknown>).total, addressBooks: normalizePage(addressBooks as PageData<unknown>).total, logs: normalizePage(logs as PageData<unknown>).total })
+        setCounts({ users: normalizePage(users as PageData<unknown> | undefined).total, devices: normalizePage(devices as PageData<unknown>).total, onlineDevices: normalizePage(onlineDevices as PageData<unknown>).total, addressBooks: normalizePage(addressBooks as PageData<unknown>).total, logs: normalizePage(logs as PageData<unknown>).total })
       } catch (error) { show(errorMessage(error), 'error') }
       finally { setLoading(false) }
     }
@@ -35,6 +35,7 @@ export default function DashboardPage() {
   const stats = [
     ...(isAdmin ? [{ label: '用户总数', value: counts.users, icon: Users, color: 'text-sky-600 bg-sky-50' }] : []),
     { label: '设备总数', value: counts.devices, icon: Cpu, color: 'text-emerald-600 bg-emerald-50' },
+    { label: '在线设备', value: counts.onlineDevices, icon: Server, color: 'text-cyan-600 bg-cyan-50' },
     { label: '地址簿条目', value: counts.addressBooks, icon: BookUser, color: 'text-violet-600 bg-violet-50' },
     { label: isAdmin ? '连接记录' : '登录记录', value: counts.logs, icon: Activity, color: 'text-amber-600 bg-amber-50' },
   ]
