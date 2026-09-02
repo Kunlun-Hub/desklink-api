@@ -27,14 +27,16 @@ const maxRecordingChunkSize int64 = 8 * 1024 * 1024
 type RecordingService struct{}
 
 type RecordingInit struct {
-	PeerId    string `json:"peer_id" binding:"required,max=64"`
-	Uuid      string `json:"uuid" binding:"required,max=255"`
-	FromPeer  string `json:"from_peer" binding:"max=64"`
-	FromName  string `json:"from_name" binding:"max=255"`
-	SessionId string `json:"session_id" binding:"max=128"`
-	Filename  string `json:"filename" binding:"required,max=255"`
-	Codec     string `json:"codec" binding:"max=16"`
-	StartedAt int64  `json:"started_at"`
+	UploadId    string `json:"upload_id" binding:"omitempty,max=36"`
+	UploadToken string `json:"upload_token" binding:"omitempty,max=128"`
+	PeerId      string `json:"peer_id" binding:"required,max=64"`
+	Uuid        string `json:"uuid" binding:"required,max=255"`
+	FromPeer    string `json:"from_peer" binding:"max=64"`
+	FromName    string `json:"from_name" binding:"max=255"`
+	SessionId   string `json:"session_id" binding:"max=128"`
+	Filename    string `json:"filename" binding:"required,max=255"`
+	Codec       string `json:"codec" binding:"max=16"`
+	StartedAt   int64  `json:"started_at"`
 }
 
 func (s *RecordingService) storagePath() string {
@@ -174,11 +176,31 @@ func (s *RecordingService) InitUpload(in *RecordingInit) (*model.SessionRecordin
 	if err != nil {
 		return nil, "", err
 	}
-	token, err := randomToken()
-	if err != nil {
-		return nil, "", err
+	uploadId := strings.TrimSpace(in.UploadId)
+	token := strings.TrimSpace(in.UploadToken)
+	if uploadId != "" {
+		if _, err := uuid.Parse(uploadId); err != nil || len(token) < 32 {
+			return nil, "", errors.New("invalid client upload identity")
+		}
+		existing := &model.SessionRecording{}
+		err := DB.Where("upload_id = ?", uploadId).First(existing).Error
+		if err == nil {
+			if existing.PeerId != in.PeerId || subtle.ConstantTimeCompare([]byte(tokenHash(token)), []byte(existing.UploadTokenHash)) != 1 {
+				return nil, "", errors.New("upload identity is already in use")
+			}
+			return existing, token, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, "", err
+		}
+	} else {
+		uploadId = uuid.NewString()
+		var err error
+		token, err = randomToken()
+		if err != nil {
+			return nil, "", err
+		}
 	}
-	uploadId := uuid.NewString()
 	storageName := uploadId + "." + container
 	if err = os.MkdirAll(s.storagePath(), 0750); err != nil {
 		return nil, "", err
@@ -246,6 +268,15 @@ func (s *RecordingService) WriteChunk(recording *model.SessionRecording, offset 
 }
 
 func (s *RecordingService) Complete(recording *model.SessionRecording, durationMs int64, expectedHash string) error {
+	if recording.Status == model.RecordingStatusComplete || recording.Status == model.RecordingStatusTranscoding {
+		if expectedHash == "" || strings.EqualFold(expectedHash, recording.Sha256) {
+			return nil
+		}
+		return errors.New("sha256 mismatch for completed recording")
+	}
+	if recording.Status != model.RecordingStatusUploading {
+		return errors.New("upload is not active")
+	}
 	path := filepath.Join(s.storagePath(), recording.StorageName)
 	if recording.Size <= 0 {
 		return errors.New("recording is empty")
@@ -276,7 +307,7 @@ func (s *RecordingService) Complete(recording *model.SessionRecording, durationM
 	}
 	if err = DB.Model(recording).Updates(map[string]interface{}{
 		"status": status, "size": info.Size(), "duration_ms": durationMs,
-		"completed_at": time.Now().Unix(), "sha256": hash, "upload_token_hash": "",
+		"completed_at": time.Now().Unix(), "sha256": hash,
 	}).Error; err != nil {
 		return err
 	}

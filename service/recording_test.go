@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lejianwen/rustdesk-api/v2/config"
 	"github.com/lejianwen/rustdesk-api/v2/model"
 	"github.com/sirupsen/logrus"
@@ -125,6 +126,13 @@ func TestRecordingUploadLifecycle(t *testing.T) {
 	if stored.Status != model.RecordingStatusComplete || stored.Size != 8 || stored.DurationMs != 1234 {
 		t.Fatalf("unexpected completed recording: %+v", stored)
 	}
+	authorized, err = service.Authorized(recording.UploadId, token)
+	if err != nil {
+		t.Fatal("completed upload token should remain valid for idempotent completion")
+	}
+	if err = service.Complete(authorized, 1234, hex.EncodeToString(expected[:])); err != nil {
+		t.Fatalf("repeated completion was not idempotent: %v", err)
+	}
 	file, err := os.Open(service.FilePath(stored))
 	if err != nil {
 		t.Fatal(err)
@@ -134,8 +142,8 @@ func TestRecordingUploadLifecycle(t *testing.T) {
 	if err != nil || string(content) != "abcdefgh" {
 		t.Fatalf("unexpected recording content %q: %v", content, err)
 	}
-	if _, err = service.Authorized(recording.UploadId, token); err == nil {
-		t.Fatal("upload token remained usable after completion")
+	if _, err = service.WriteChunk(authorized, 0, bytes.NewReader([]byte("xxxx")), 4); err == nil {
+		t.Fatal("completed recording accepted another chunk")
 	}
 }
 
@@ -160,6 +168,36 @@ func TestRecordingCancel(t *testing.T) {
 	}
 	if err = DB.First(&model.SessionRecording{}, recording.Id).Error; err == nil {
 		t.Fatal("cancelled upload metadata still exists")
+	}
+}
+
+func TestRecordingInitIsIdempotent(t *testing.T) {
+	service := setupRecordingTest(t)
+	if err := DB.Create(&model.Peer{Id: "peer-a", Uuid: "uuid-a"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := service.SavePolicy(model.RecordingModeAll, 30, nil); err != nil {
+		t.Fatal(err)
+	}
+	form := &RecordingInit{
+		UploadId: uuid.NewString(), UploadToken: "0123456789abcdef0123456789abcdef",
+		PeerId: "peer-a", Uuid: "uuid-a", Filename: "retry.webm",
+	}
+	first, token, err := service.InitUpload(form)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, secondToken, err := service.InitUpload(form)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Id != second.Id || token != secondToken {
+		t.Fatal("repeated init created a second upload")
+	}
+	var count int64
+	DB.Model(&model.SessionRecording{}).Count(&count)
+	if count != 1 {
+		t.Fatalf("expected one upload, got %d", count)
 	}
 }
 
