@@ -247,6 +247,9 @@ func (s *RecordingService) WriteChunk(recording *model.SessionRecording, offset 
 
 func (s *RecordingService) Complete(recording *model.SessionRecording, durationMs int64, expectedHash string) error {
 	path := filepath.Join(s.storagePath(), recording.StorageName)
+	if recording.Size <= 0 {
+		return errors.New("recording is empty")
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return err
