@@ -225,6 +225,60 @@ func TestRecordingSessionMerge(t *testing.T) {
 	}
 }
 
+func TestRecordingSessionMergeWithRelativeStoragePath(t *testing.T) {
+	service := setupRecordingTest(t)
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg is not installed")
+	}
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	storageDirectory, err := os.MkdirTemp(workingDirectory, ".recording-relative-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(storageDirectory)
+	relativePath, err := filepath.Rel(workingDirectory, storageDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	Config.Recording.Path = relativePath
+	makeSegment := func(name, color string) {
+		path := filepath.Join(storageDirectory, name)
+		command := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c="+color+":s=160x120:r=10", "-t", "1", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", path)
+		if output, commandErr := command.CombinedOutput(); commandErr != nil {
+			t.Fatalf("create relative test segment: %v: %s", commandErr, output)
+		}
+	}
+	makeSegment("relative-first.mp4", "black")
+	makeSegment("relative-second.mp4", "white")
+	segments := []*model.SessionRecording{
+		{UploadId: "relative-first", UploadTokenHash: "unused", PeerId: "relative-peer", FromPeer: "controller", SessionId: "relative-session", OriginalName: "relative-first.mp4", StorageName: "relative-first.mp4", StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete, DurationMs: 1000},
+		{UploadId: "relative-second", UploadTokenHash: "unused", PeerId: "relative-peer", FromPeer: "controller", SessionId: "relative-session", OriginalName: "relative-second.mp4", StorageName: "relative-second.mp4", StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete, DurationMs: 1000},
+	}
+	for _, segment := range segments {
+		info, statErr := os.Stat(filepath.Join(storageDirectory, segment.StorageName))
+		if statErr != nil {
+			t.Fatal(statErr)
+		}
+		segment.Size = info.Size()
+	}
+	if err = DB.Create(&segments).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = service.MergeSession(segments[0]); err != nil {
+		t.Fatal(err)
+	}
+	var count int64
+	if err = DB.Model(&model.SessionRecording{}).Where("session_id = ?", "relative-session").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("relative storage session was not merged: %d", count)
+	}
+}
+
 func TestMergeExistingSessionsFindsSessionID(t *testing.T) {
 	service := setupRecordingTest(t)
 	first := &model.SessionRecording{

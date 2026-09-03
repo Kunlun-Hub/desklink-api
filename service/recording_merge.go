@@ -97,6 +97,14 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 			return materializeErr
 		}
 		cleanups = append(cleanups, cleanup)
+		value, err = filepath.Abs(value)
+		if err != nil {
+			_ = listFile.Close()
+			for _, clean := range cleanups {
+				clean()
+			}
+			return err
+		}
 		if _, err = fmt.Fprintf(listFile, "file '%s'\n", strings.ReplaceAll(value, "'", "'\\''")); err != nil {
 			_ = listFile.Close()
 			for _, clean := range cleanups {
