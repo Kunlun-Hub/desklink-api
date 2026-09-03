@@ -34,6 +34,9 @@ Credentials are supplied out of band; never put them in this document or Git.
   transcode, retention, and metadata lifecycle.
 - `service/recording_storage.go`: local/mounted filesystem, FTP/FTPS, and S3
   object-store adapters plus encrypted storage settings.
+- `service/recording_merge.go`: debounced merge of segments sharing a remote
+  `peer_id + from_peer + session_id`; display/encoder changes within one live
+  session should not remain as separate final recordings.
 - `model/recording.go`: recording, policy, and versioned storage setting models.
 - `http/controller/api/recording.go`: device upload and signed content delivery.
 - `http/controller/admin/recording.go`: admin policy/storage/list endpoints.
@@ -60,6 +63,13 @@ Uploads and H.265 preview transcoding always stage under
 completion, files are archived to the selected backend. Each recording stores
 `storage_setting_id`; changing a bucket/path/backend affects new recordings only
 and must not break old preview, download, retention, or deletion.
+
+When a client rebuilds its encoder for display or parameter changes, the API
+receives multiple completed segments. A five-second debounce merges segments
+with the same `peer_id`, `from_peer`, and non-empty `session_id`. Stream copy is
+attempted first; incompatible dimensions/codecs fall back to H.264 MP4. The
+earliest row remains as the audit record and duration/size/hash are recomputed.
+Do not merge rows with an empty session ID.
 
 FTP/S3 secrets are AES-GCM encrypted using a key derived from
 `RUSTDESK_API_JWT_KEY`. The admin API returns only `has_password` and

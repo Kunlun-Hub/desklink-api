@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -150,5 +151,76 @@ func TestRecordingObjectStoreIntegration(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestRecordingSessionMerge(t *testing.T) {
+	service := setupRecordingTest(t)
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg is not installed")
+	}
+	if err := DB.Create(&model.Peer{Id: "peer-merge", Uuid: "uuid-merge"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := service.SavePolicy(model.RecordingModeAll, 30, nil); err != nil {
+		t.Fatal(err)
+	}
+	segmentDir := t.TempDir()
+	makeSegment := func(name, color string) string {
+		path := filepath.Join(segmentDir, name)
+		command := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c="+color+":s=320x240:r=10", "-t", "1", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", path)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("create test segment: %v: %s", err, output)
+		}
+		return path
+	}
+	firstPath := makeSegment("first.mp4", "red")
+	secondPath := makeSegment("second.mp4", "blue")
+	firstInfo, err := os.Stat(firstPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondInfo, err := os.Stat(secondPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := &model.SessionRecording{
+		UploadId: "merge-first", UploadTokenHash: "unused", PeerId: "peer-merge", FromPeer: "controller",
+		FromName: "Admin", SessionId: "session-merge", OriginalName: "first.mp4", StorageName: "first.mp4",
+		StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete,
+		Size: firstInfo.Size(), DurationMs: 1000,
+	}
+	second := &model.SessionRecording{
+		UploadId: "merge-second", UploadTokenHash: "unused", PeerId: "peer-merge", FromPeer: "controller",
+		FromName: "Admin", SessionId: "session-merge", OriginalName: "second.mp4", StorageName: "second.mp4",
+		StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete,
+		Size: secondInfo.Size(), DurationMs: 1000,
+	}
+	if err = os.Rename(firstPath, service.FilePath(first)); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Rename(secondPath, service.FilePath(second)); err != nil {
+		t.Fatal(err)
+	}
+	if err = DB.Create([]*model.SessionRecording{first, second}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = service.MergeSession(first); err != nil {
+		t.Fatal(err)
+	}
+	var records []*model.SessionRecording
+	if err = DB.Where("session_id = ?", "session-merge").Find(&records).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 || records[0].Id != first.Id || records[0].DurationMs != 2000 || records[0].Container != "mp4" {
+		t.Fatalf("unexpected merged metadata: %#v", records)
+	}
+	mergedPath := service.FilePath(records[0])
+	mergedInfo, err := os.Stat(mergedPath)
+	if err != nil || mergedInfo.Size() <= firstInfo.Size() {
+		t.Fatalf("merged recording is missing or too small: %v", err)
+	}
+	if _, err = os.Stat(filepath.Join(service.storagePath(), "second.mp4")); !os.IsNotExist(err) {
+		t.Fatalf("duplicate segment still exists: %v", err)
 	}
 }

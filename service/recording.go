@@ -323,6 +323,7 @@ func (s *RecordingService) Complete(recording *model.SessionRecording, durationM
 		go s.TranscodePreview(recording.Id)
 	} else {
 		s.removeStagedRecordingObject(recording, recording.StorageName)
+		s.scheduleSessionMerge(recording)
 	}
 	return nil
 }
@@ -390,6 +391,7 @@ func (s *RecordingService) TranscodePreview(id uint) {
 	}
 	s.removeStagedRecordingObject(recording, recording.StorageName)
 	s.removeStagedRecordingObject(recording, previewName)
+	s.scheduleSessionMerge(recording)
 }
 
 func (s *RecordingService) List(page, pageSize uint, peerId, fromPeer, status string, startedAfter, startedBefore int64) *model.SessionRecordingList {
