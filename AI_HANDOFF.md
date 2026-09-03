@@ -10,7 +10,7 @@ community project.
 ## Current Production Snapshot
 
 - Host: `10.202.22.90`; deployment directory: `/opt/desklink`
-- API image: `ohoimager/desklink-api:1.4.9-session-merge-v5`
+- API image: `ohoimager/desklink-api:1.4.9-session-merge-v6`
 - Docker Hub manifest digest:
   `sha256:b69bf8af6c8cb10e146f16e2ce451c90f6d0b5a7a2b80c97b2cfc60c88042c66`
 - Server image: `ohoimager/desklink-server:1.4.9-secure-tcp`
@@ -66,9 +66,9 @@ and must not break old preview, download, retention, or deletion.
 
 When a client rebuilds its encoder for display or parameter changes, the API
 receives multiple completed segments. A five-second debounce merges segments
-with the same `peer_id`, `from_peer`, and non-empty `session_id`. Stream copy is
-attempted only when codecs and containers match; mixed codecs or incompatible
-streams are normalized to one resolution and re-encoded as H.264 MP4. The
+with the same `peer_id`, `from_peer`, and non-empty `session_id`. Every segment
+is normalized to one resolution and re-encoded as H.264 before concatenation;
+this is required because display switches can change codec or dimensions. The
 earliest row remains as the audit record and duration/size/hash are recomputed.
 Do not merge rows with an empty session ID.
 

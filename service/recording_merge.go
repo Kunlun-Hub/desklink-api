@@ -77,26 +77,17 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 		return nil
 	}
 	primary := segments[0]
-	if primary.StorageSettingId != recording.StorageSettingId {
-		return errors.New("recording segments use different storage settings")
-	}
 
 	tempDir, err := os.MkdirTemp("", "desklink-recording-merge-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tempDir)
-	listPath := filepath.Join(tempDir, "concat.txt")
-	listFile, err := os.OpenFile(listPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
 	cleanups := make([]func(), 0, len(segments))
 	segmentPaths := make([]string, 0, len(segments))
 	for _, segment := range segments {
 		value, cleanup, materializeErr := s.MaterializeRecordingObject(segment, false)
 		if materializeErr != nil {
-			_ = listFile.Close()
 			for _, clean := range cleanups {
 				clean()
 			}
@@ -105,26 +96,12 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 		cleanups = append(cleanups, cleanup)
 		value, err = filepath.Abs(value)
 		if err != nil {
-			_ = listFile.Close()
 			for _, clean := range cleanups {
 				clean()
 			}
 			return err
 		}
 		segmentPaths = append(segmentPaths, value)
-		if _, err = fmt.Fprintf(listFile, "file '%s'\n", strings.ReplaceAll(value, "'", "'\\''")); err != nil {
-			_ = listFile.Close()
-			for _, clean := range cleanups {
-				clean()
-			}
-			return err
-		}
-	}
-	if err = listFile.Close(); err != nil {
-		for _, clean := range cleanups {
-			clean()
-		}
-		return err
 	}
 	for _, clean := range cleanups {
 		defer clean()
@@ -133,30 +110,11 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 	mergedPath := filepath.Join(tempDir, primary.UploadId+".merged.mp4")
 	ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
 	defer cancel()
-	copyArgs := []string{"-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-movflags", "+faststart", mergedPath}
-	codec := primary.Codec
-	container := primary.Container
-	canStreamCopy := true
-	for _, segment := range segments[1:] {
-		if segment.Codec != primary.Codec || segment.Container != primary.Container {
-			canStreamCopy = false
-			break
-		}
+	if err = s.reencodeRecordingSegments(ctx, segmentPaths, tempDir, mergedPath); err != nil {
+		return err
 	}
-	var output []byte
-	var runErr error
-	if canStreamCopy {
-		output, runErr = exec.CommandContext(ctx, s.ffmpegPath(), copyArgs...).CombinedOutput()
-	} else {
-		runErr = errors.New("recording segments use different codecs or containers")
-	}
-	if runErr != nil {
-		if fallbackErr := s.reencodeRecordingSegments(ctx, segmentPaths, tempDir, mergedPath); fallbackErr != nil {
-			return fmt.Errorf("stream copy: %v (%s); re-encode: %w", runErr, strings.TrimSpace(string(output)), fallbackErr)
-		}
-		codec = "h264"
-		container = "mp4"
-	}
+	codec := "h264"
+	container := "mp4"
 
 	mergedName := primary.UploadId + ".merged." + container
 	if err = s.archiveRecordingObject(primary, mergedName, mergedPath); err != nil {
