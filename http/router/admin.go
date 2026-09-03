@@ -64,6 +64,7 @@ func RecordingBind(rg *gin.RouterGroup) {
 	r.POST("/storage", cont.SaveStorage)
 	r.GET("/list", cont.List)
 	r.GET("/:id/access", cont.Access)
+	r.GET("/:id/cursor", cont.CursorTrack)
 	r.POST("/delete", cont.Delete)
 	r.POST("/batchDelete", cont.BatchDelete)
 }

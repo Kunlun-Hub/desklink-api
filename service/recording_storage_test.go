@@ -59,7 +59,7 @@ func TestMountedRecordingStorageLifecycle(t *testing.T) {
 	if _, err = service.WriteChunk(recording, 0, bytes.NewReader([]byte("mounted-data")), 12); err != nil {
 		t.Fatal(err)
 	}
-	if err = service.Complete(recording, 1000, ""); err != nil {
+	if err = service.Complete(recording, 1000, "", nil); err != nil {
 		t.Fatal(err)
 	}
 	archived := filepath.Join(mountPath, "desklink", "recordings", recording.StorageName)
@@ -188,13 +188,13 @@ func TestRecordingSessionMerge(t *testing.T) {
 		UploadId: "merge-first", UploadTokenHash: "unused", PeerId: "peer-merge", FromPeer: "controller",
 		FromName: "Admin", SessionId: "session-merge", OriginalName: "first.mp4", StorageName: "first.mp4",
 		StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete,
-		Size: firstInfo.Size(), DurationMs: 1000,
+		Size: firstInfo.Size(), DurationMs: 1000, CursorTrack: `[{"t":100,"x":100,"y":200,"visible":true}]`,
 	}
 	second := &model.SessionRecording{
 		UploadId: "merge-second", UploadTokenHash: "unused", PeerId: "peer-merge", FromPeer: "controller",
 		FromName: "Admin", SessionId: "session-merge", OriginalName: "second.mp4", StorageName: "second.mp4",
 		StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete,
-		Size: secondInfo.Size(), DurationMs: 1000,
+		Size: secondInfo.Size(), DurationMs: 1000, CursorTrack: `[{"t":200,"x":300,"y":400,"visible":true}]`,
 	}
 	if err = os.Rename(firstPath, service.FilePath(first)); err != nil {
 		t.Fatal(err)
@@ -214,6 +214,9 @@ func TestRecordingSessionMerge(t *testing.T) {
 	}
 	if len(records) != 1 || records[0].Id != first.Id || records[0].DurationMs != 2000 || records[0].Container != "mp4" {
 		t.Fatalf("unexpected merged metadata: %#v", records)
+	}
+	if records[0].CursorTrack != `[{"t":100,"x":100,"y":200,"visible":true},{"t":1200,"x":300,"y":400,"visible":true}]` {
+		t.Fatalf("unexpected merged cursor track: %s", records[0].CursorTrack)
 	}
 	mergedPath := service.FilePath(records[0])
 	mergedInfo, err := os.Stat(mergedPath)

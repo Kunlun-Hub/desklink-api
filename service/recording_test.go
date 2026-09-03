@@ -120,7 +120,8 @@ func TestRecordingUploadLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	expected := sha256.Sum256([]byte("abcdefgh"))
-	if err = service.Complete(authorized, 1234, hex.EncodeToString(expected[:])); err != nil {
+	cursorTrack := []RecordingCursorSample{{Time: 100, X: 1200, Y: 2400, Visible: true}}
+	if err = service.Complete(authorized, 1234, hex.EncodeToString(expected[:]), cursorTrack); err != nil {
 		t.Fatal(err)
 	}
 	stored, err := service.Info(recording.Id)
@@ -130,11 +131,14 @@ func TestRecordingUploadLifecycle(t *testing.T) {
 	if stored.Status != model.RecordingStatusComplete || stored.Size != 8 || stored.DurationMs != 1234 {
 		t.Fatalf("unexpected completed recording: %+v", stored)
 	}
+	if stored.CursorTrack != `[{"t":100,"x":1200,"y":2400,"visible":true}]` {
+		t.Fatalf("unexpected cursor track: %s", stored.CursorTrack)
+	}
 	authorized, err = service.Authorized(recording.UploadId, token)
 	if err != nil {
 		t.Fatal("completed upload token should remain valid for idempotent completion")
 	}
-	if err = service.Complete(authorized, 1234, hex.EncodeToString(expected[:])); err != nil {
+	if err = service.Complete(authorized, 1234, hex.EncodeToString(expected[:]), nil); err != nil {
 		t.Fatalf("repeated completion was not idempotent: %v", err)
 	}
 	file, err := os.Open(service.FilePath(stored))

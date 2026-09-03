@@ -7,7 +7,7 @@ import type { ResourceColumn, ResourceConfig, ResourceField } from '../features/
 type Row = Record<string, any>
 
 function formatDate(value: unknown) {
-  if (value === null || value === undefined || value === '') return '—'
+  if (value === null || value === undefined || value === '' || Number(value) === 0) return '—'
   const raw = Number(value)
   const date = Number.isFinite(raw) ? new Date(raw < 10_000_000_000 ? raw * 1000 : raw) : new Date(String(value))
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-CN', { hour12: false })
@@ -81,6 +81,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
   const [appliedQuery, setAppliedQuery] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<Row | null | undefined>(undefined)
   const [form, setForm] = useState<Row>({})
+  const [users, setUsers] = useState<Record<string, string>>({})
   const pageSize = config.pageSize || 20
 
   const load = useCallback(async () => {
@@ -97,6 +98,13 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
   }, [config.listPath, page, pageSize, appliedQuery, show])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (!config.columns.some((column) => column.format === 'user')) return
+    get<PageData<Row>>('/user/list', { page: 1, page_size: 1000 })
+      .then((response) => setUsers(Object.fromEntries(normalizePage(response).list.map((user) => [String(user.id), String(user.username || user.nickname || user.id)]))))
+      .catch(() => setUsers({}))
+  }, [config.columns])
 
   const totalPages = Math.max(1, Math.ceil(data.total / pageSize))
   const startCreate = () => {
@@ -180,7 +188,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
                 <tr><td colSpan={config.columns.length + 1} className="h-52 text-center text-sm text-base-content/40">暂无数据</td></tr>
               ) : data.list.map((row, index) => (
                 <tr key={String(row[config.idKey || 'id'] ?? index)} className="hover:bg-base-200/40">
-                  {config.columns.map((column) => <td key={column.key}><Cell column={column} value={row[column.key]} /></td>)}
+                  {config.columns.map((column) => <td key={column.key}>{column.format === 'user' ? <span>{users[String(row[column.key])] ? `${users[String(row[column.key])]} (${row[column.key]})` : row[column.key] || '—'}</span> : <Cell column={column} value={row[column.key]} />}</td>)}
                   {!config.readOnly && (config.updatePath || config.deletePath) && (
                     <td><div className="flex justify-end gap-1">{config.updatePath && <button className="btn btn-ghost btn-xs" onClick={() => startEdit(row)} title="编辑"><Pencil size={14} /></button>}{config.deletePath && <button className="btn btn-ghost btn-xs text-error" onClick={() => void remove(row)} title="删除"><Trash2 size={14} /></button>}</div></td>
                   )}

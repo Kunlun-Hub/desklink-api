@@ -46,6 +46,7 @@ type SessionRecording struct {
 	CompletedAt        int64  `gorm:"default:0;not null" json:"completed_at"`
 	Sha256             string `gorm:"size:64;default:'';not null" json:"sha256"`
 	ErrorMessage       string `gorm:"size:512;default:'';not null" json:"error_message"`
+	CursorTrack        string `gorm:"type:longtext" json:"-"`
 	TimeModel
 }
 

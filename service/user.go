@@ -170,10 +170,13 @@ func (us *UserService) CheckUserEnable(u *model.User) bool {
 // Create 创建
 func (us *UserService) Create(u *model.User) error {
 	// The initial username should be formatted, and the username should be unique
+	u.Username = us.formatUsername(u.Username)
+	if u.Password == "" {
+		return errors.New("PasswordRequired")
+	}
 	if us.IsUsernameExists(u.Username) {
 		return errors.New("UsernameExists")
 	}
-	u.Username = us.formatUsername(u.Username)
 	var err error
 	u.Password, err = utils.EncryptPassword(u.Password)
 	if err != nil {

@@ -13,12 +13,39 @@ func (as *AuditService) AuditConnList(page, pageSize uint, where func(tx *gorm.D
 	res.Page = int64(page)
 	res.PageSize = int64(pageSize)
 	tx := DB.Model(&model.AuditConn{})
+	tx.Where("session_id <> '' AND session_id <> '0' AND from_peer <> ''")
 	if where != nil {
 		where(tx)
 	}
 	tx.Count(&res.Total)
 	tx.Scopes(Paginate(page, pageSize))
 	tx.Find(&res.AuditConns)
+	missing := make([]string, 0)
+	for _, audit := range res.AuditConns {
+		if audit.FromName == "" && audit.FromPeer != "" {
+			missing = append(missing, audit.FromPeer)
+		}
+	}
+	if len(missing) > 0 {
+		var peers []*model.Peer
+		DB.Select("id", "alias", "hostname", "username").Where("id IN ?", missing).Find(&peers)
+		names := make(map[string]string, len(peers))
+		for _, peer := range peers {
+			name := peer.Alias
+			if name == "" {
+				name = peer.Hostname
+			}
+			if name == "" {
+				name = peer.Username
+			}
+			names[peer.Id] = name
+		}
+		for _, audit := range res.AuditConns {
+			if audit.FromName == "" {
+				audit.FromName = names[audit.FromPeer]
+			}
+		}
+	}
 	return
 }
 

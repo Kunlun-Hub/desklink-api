@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -37,6 +38,13 @@ type RecordingInit struct {
 	Filename    string `json:"filename" binding:"required,max=255"`
 	Codec       string `json:"codec" binding:"max=16"`
 	StartedAt   int64  `json:"started_at"`
+}
+
+type RecordingCursorSample struct {
+	Time    int64  `json:"t"`
+	X       uint16 `json:"x"`
+	Y       uint16 `json:"y"`
+	Visible bool   `json:"visible"`
 }
 
 func (s *RecordingService) storagePath() string {
@@ -272,7 +280,7 @@ func (s *RecordingService) WriteChunk(recording *model.SessionRecording, offset 
 	return written, nil
 }
 
-func (s *RecordingService) Complete(recording *model.SessionRecording, durationMs int64, expectedHash string) error {
+func (s *RecordingService) Complete(recording *model.SessionRecording, durationMs int64, expectedHash string, cursorTrack []RecordingCursorSample) error {
 	if recording.Status == model.RecordingStatusComplete || recording.Status == model.RecordingStatusTranscoding {
 		if expectedHash == "" || strings.EqualFold(expectedHash, recording.Sha256) {
 			return nil
@@ -302,6 +310,13 @@ func (s *RecordingService) Complete(recording *model.SessionRecording, durationM
 	if expectedHash != "" && !strings.EqualFold(expectedHash, hash) {
 		return fmt.Errorf("sha256 mismatch")
 	}
+	if len(cursorTrack) > 500_000 {
+		return errors.New("cursor track is too large")
+	}
+	track, err := json.Marshal(cursorTrack)
+	if err != nil {
+		return err
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		return err
@@ -315,7 +330,7 @@ func (s *RecordingService) Complete(recording *model.SessionRecording, durationM
 	}
 	if err = DB.Model(recording).Updates(map[string]interface{}{
 		"status": status, "size": info.Size(), "duration_ms": durationMs,
-		"completed_at": time.Now().Unix(), "sha256": hash,
+		"completed_at": time.Now().Unix(), "sha256": hash, "cursor_track": string(track),
 	}).Error; err != nil {
 		return err
 	}

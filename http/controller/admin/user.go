@@ -61,6 +61,10 @@ func (ct *User) Create(c *gin.Context) {
 		response.Fail(c, 101, errList[0])
 		return
 	}
+	if f.Password == "" {
+		response.Fail(c, 101, "Password is required")
+		return
+	}
 	u := f.ToUser()
 	err := service.AllService.UserService.Create(u)
 	if err != nil {

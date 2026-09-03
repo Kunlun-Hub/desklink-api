@@ -17,7 +17,7 @@ export interface ResourceField {
 export interface ResourceColumn {
   key: string
   label: string
-  format?: 'status' | 'boolean' | 'online' | 'datetime' | 'tags' | 'platform' | 'secret'
+  format?: 'status' | 'boolean' | 'online' | 'datetime' | 'tags' | 'platform' | 'secret' | 'user'
 }
 
 export interface ResourceConfig {
@@ -51,7 +51,7 @@ export const resources: Record<string, ResourceConfig> = {
       { key: 'group_id', label: '用户组' }, { key: 'is_admin', label: '管理员', format: 'boolean' }, { key: 'status', label: '状态', format: 'status' }, { key: 'created_at', label: '创建时间', format: 'datetime' },
     ],
     fields: [
-      { key: 'username', label: '用户名', required: true }, { key: 'nickname', label: '显示名称' }, { key: 'email', label: '邮箱' },
+      { key: 'username', label: '用户名', required: true }, { key: 'password', label: '登录密码', kind: 'password', requiredOnCreate: true, createOnly: true }, { key: 'nickname', label: '显示名称' }, { key: 'email', label: '邮箱' },
       { key: 'group_id', label: '用户组 ID', kind: 'number', required: true, defaultValue: 1 },
       { key: 'is_admin', label: '管理员权限', kind: 'boolean', defaultValue: false },
       { key: 'status', label: '账号状态', kind: 'select', options: enabledOptions, defaultValue: 1 }, { key: 'remark', label: '备注' },
@@ -61,7 +61,7 @@ export const resources: Record<string, ResourceConfig> = {
     key: 'devices', title: '设备管理', description: '查看客户端上报的设备状态和版本信息', listPath: '/peer/list', createPath: '/peer/create', updatePath: '/peer/update', deletePath: '/peer/delete', idKey: 'row_id', deleteBodyKey: 'row_id',
     columns: [
       { key: 'id', label: '设备 ID' }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' }, { key: 'os', label: '平台', format: 'platform' },
-      { key: 'username', label: '系统用户' }, { key: 'version', label: '客户端版本' }, { key: 'online', label: '在线状态', format: 'online' }, { key: 'last_online_time', label: '最后在线', format: 'datetime' },
+      { key: 'username', label: '系统用户' }, { key: 'last_online_ip', label: '当前/最近 IP' }, { key: 'version', label: '客户端版本' }, { key: 'online', label: '在线状态', format: 'online' }, { key: 'last_online_time', label: '最后在线', format: 'datetime' },
     ],
     fields: [
       { key: 'id', label: '设备 ID', required: true }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' },
@@ -83,7 +83,7 @@ export const resources: Record<string, ResourceConfig> = {
     key: 'address-books', title: '地址簿', description: '管理用户的远程设备条目和连接信息', listPath: '/address_book/list', createPath: '/address_book/create', updatePath: '/address_book/update', deletePath: '/address_book/delete', idKey: 'row_id', deleteBodyKey: 'row_id',
     columns: [
       { key: 'id', label: '设备 ID' }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' }, { key: 'platform', label: '平台', format: 'platform' },
-      { key: 'tags', label: '标签', format: 'tags' }, { key: 'user_id', label: '所属用户' }, { key: 'online', label: '在线', format: 'online' },
+      { key: 'tags', label: '标签', format: 'tags' }, { key: 'user_id', label: '所属用户', format: 'user' }, { key: 'online', label: '在线', format: 'online' },
     ],
     fields: [
       { key: 'id', label: '设备 ID', required: true }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' }, { key: 'username', label: '系统用户' },
@@ -94,18 +94,18 @@ export const resources: Record<string, ResourceConfig> = {
   },
   tags: {
     key: 'tags', title: '标签管理', description: '维护地址簿标签和颜色', listPath: '/tag/list', createPath: '/tag/create', updatePath: '/tag/update', deletePath: '/tag/delete',
-    columns: [{ key: 'name', label: '名称' }, { key: 'color', label: '颜色值' }, { key: 'user_id', label: '用户 ID' }, { key: 'collection_id', label: '地址簿 ID' }],
+    columns: [{ key: 'name', label: '名称' }, { key: 'color', label: '颜色值' }, { key: 'user_id', label: '用户', format: 'user' }, { key: 'collection_id', label: '地址簿 ID' }],
     fields: [{ key: 'name', label: '名称', required: true }, { key: 'color', label: 'Flutter 颜色值', kind: 'number', required: true, defaultValue: 4278255360 }, { key: 'user_id', label: '用户 ID', kind: 'number' }, { key: 'collection_id', label: '地址簿 ID', kind: 'number' }],
   },
   collections: {
     key: 'collections', title: '地址簿集合', description: '为用户创建和组织多个独立地址簿', listPath: '/address_book_collection/list', createPath: '/address_book_collection/create', updatePath: '/address_book_collection/update', deletePath: '/address_book_collection/delete',
-    columns: [{ key: 'id', label: 'ID' }, { key: 'name', label: '名称' }, { key: 'user_id', label: '所属用户' }, { key: 'created_at', label: '创建时间', format: 'datetime' }],
+    columns: [{ key: 'id', label: 'ID' }, { key: 'name', label: '名称' }, { key: 'user_id', label: '所属用户', format: 'user' }, { key: 'created_at', label: '创建时间', format: 'datetime' }],
     fields: [{ key: 'name', label: '名称', required: true }, { key: 'user_id', label: '所属用户 ID', kind: 'number', required: true }],
     search: [{ key: 'user_id', label: '用户 ID' }],
   },
   collectionRules: {
     key: 'collection-rules', title: '共享规则', description: '将地址簿按只读、读写或完全控制权限共享给用户或用户组', listPath: '/address_book_collection_rule/list', createPath: '/address_book_collection_rule/create', updatePath: '/address_book_collection_rule/update', deletePath: '/address_book_collection_rule/delete',
-    columns: [{ key: 'id', label: 'ID' }, { key: 'collection_id', label: '地址簿 ID' }, { key: 'user_id', label: '所有者' }, { key: 'type', label: '共享对象' }, { key: 'to_id', label: '目标 ID' }, { key: 'rule', label: '权限' }],
+    columns: [{ key: 'id', label: 'ID' }, { key: 'collection_id', label: '地址簿 ID' }, { key: 'user_id', label: '所有者', format: 'user' }, { key: 'type', label: '共享对象' }, { key: 'to_id', label: '目标 ID' }, { key: 'rule', label: '权限' }],
     fields: [
       { key: 'collection_id', label: '地址簿 ID', kind: 'number', required: true }, { key: 'user_id', label: '所有者用户 ID', kind: 'number', required: true },
       { key: 'type', label: '共享对象', kind: 'select', options: [{ label: '用户', value: 1 }, { label: '用户组', value: 2 }], defaultValue: 1 },
@@ -132,7 +132,7 @@ export const resources: Record<string, ResourceConfig> = {
   },
   myDevices: {
     key: 'my-devices', title: '我的设备', description: '当前账号绑定和最近上报的设备', listPath: '/my/peer/list', readOnly: true,
-    columns: [{ key: 'id', label: '设备 ID' }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' }, { key: 'os', label: '平台', format: 'platform' }, { key: 'version', label: '版本' }, { key: 'online', label: '在线状态', format: 'online' }, { key: 'last_online_time', label: '最后在线', format: 'datetime' }],
+    columns: [{ key: 'id', label: '设备 ID' }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' }, { key: 'os', label: '平台', format: 'platform' }, { key: 'last_online_ip', label: '当前/最近 IP' }, { key: 'version', label: '版本' }, { key: 'online', label: '在线状态', format: 'online' }, { key: 'last_online_time', label: '最后在线', format: 'datetime' }],
   },
   myAddressBooks: {
     key: 'my-address-books', title: '我的地址簿', description: '维护当前账号可访问的远程设备', listPath: '/my/address_book/list', createPath: '/my/address_book/create', updatePath: '/my/address_book/update', deletePath: '/my/address_book/delete', idKey: 'row_id', deleteBodyKey: 'row_id',
@@ -170,11 +170,11 @@ export const resources: Record<string, ResourceConfig> = {
   },
   loginLogs: {
     key: 'login-logs', title: '登录日志', description: '检查账号登录来源和客户端类型', listPath: '/login_log/list', deletePath: '/login_log/delete',
-    columns: [{ key: 'user_id', label: '用户 ID' }, { key: 'client', label: '客户端' }, { key: 'device_id', label: '设备 ID' }, { key: 'ip', label: 'IP 地址' }, { key: 'type', label: '类型' }, { key: 'platform', label: '平台', format: 'platform' }, { key: 'created_at', label: '登录时间', format: 'datetime' }],
+    columns: [{ key: 'user_id', label: '用户', format: 'user' }, { key: 'client', label: '客户端' }, { key: 'device_id', label: '设备 ID' }, { key: 'ip', label: 'IP 地址' }, { key: 'type', label: '类型' }, { key: 'platform', label: '平台', format: 'platform' }, { key: 'created_at', label: '登录时间', format: 'datetime' }],
   },
   connectionAudit: {
     key: 'connection-audit', title: '连接审计', description: '记录远程会话的建立与关闭', listPath: '/audit_conn/list', deletePath: '/audit_conn/delete',
-    columns: [{ key: 'action', label: '动作' }, { key: 'peer_id', label: '目标设备' }, { key: 'from_peer', label: '来源设备' }, { key: 'from_name', label: '来源名称' }, { key: 'ip', label: 'IP 地址' }, { key: 'session_id', label: '会话 ID' }, { key: 'created_at', label: '时间', format: 'datetime' }],
+    columns: [{ key: 'peer_id', label: '目标设备' }, { key: 'from_peer', label: '来源设备' }, { key: 'from_name', label: '来源名称' }, { key: 'ip', label: 'IP 地址' }, { key: 'session_id', label: '会话 ID' }, { key: 'created_at', label: '开始时间', format: 'datetime' }, { key: 'close_time', label: '结束时间', format: 'datetime' }],
     search: [{ key: 'peer_id', label: '目标设备' }, { key: 'from_peer', label: '来源设备' }],
   },
   fileAudit: {
@@ -184,10 +184,10 @@ export const resources: Record<string, ResourceConfig> = {
   },
   tokens: {
     key: 'tokens', title: '访问令牌', description: '查看和撤销已登录客户端令牌', listPath: '/user_token/list', deletePath: '/user_token/delete',
-    columns: [{ key: 'user_id', label: '用户 ID' }, { key: 'device_id', label: '设备 ID' }, { key: 'device_uuid', label: '设备 UUID' }, { key: 'token', label: '令牌', format: 'secret' }, { key: 'expired_at', label: '过期时间', format: 'datetime' }, { key: 'created_at', label: '创建时间', format: 'datetime' }],
+    columns: [{ key: 'user_id', label: '用户', format: 'user' }, { key: 'device_id', label: '设备 ID' }, { key: 'device_uuid', label: '设备 UUID' }, { key: 'token', label: '令牌', format: 'secret' }, { key: 'expired_at', label: '过期时间', format: 'datetime' }, { key: 'created_at', label: '创建时间', format: 'datetime' }],
   },
   shares: {
     key: 'shares', title: '分享记录', description: '管理 Web 客户端临时分享记录', listPath: '/share_record/list', deletePath: '/share_record/delete',
-    columns: [{ key: 'user_id', label: '用户 ID' }, { key: 'peer_id', label: '设备 ID' }, { key: 'password_type', label: '密码类型' }, { key: 'share_token', label: '分享令牌', format: 'secret' }, { key: 'expire', label: '过期时间', format: 'datetime' }, { key: 'created_at', label: '创建时间', format: 'datetime' }],
+    columns: [{ key: 'user_id', label: '用户', format: 'user' }, { key: 'peer_id', label: '设备 ID' }, { key: 'password_type', label: '密码类型' }, { key: 'share_token', label: '分享令牌', format: 'secret' }, { key: 'expire', label: '过期时间', format: 'datetime' }, { key: 'created_at', label: '创建时间', format: 'datetime' }],
   },
 }

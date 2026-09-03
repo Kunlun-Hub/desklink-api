@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Cloud, Download, Film, HardDrive, Play, RefreshCw, Save, Search, Trash2, X } from 'lucide-react'
+import { Cloud, Download, Film, HardDrive, MousePointer2, Play, RefreshCw, Save, Search, Trash2, X } from 'lucide-react'
 import { errorMessage, get, normalizePage, post, type PageData } from '../lib/api'
 import { useToast } from '../components/Toast'
 
@@ -37,6 +37,7 @@ interface Recording {
 }
 
 interface AccessResponse { url: string; expires_at: number }
+interface CursorSample { t: number; x: number; y: number; visible: boolean }
 
 type StorageBackend = 'local' | 'ftp' | 'nfs' | 'smb' | 's3'
 
@@ -103,7 +104,8 @@ export default function RecordingsPage() {
   const [startedAfter, setStartedAfter] = useState('')
   const [startedBefore, setStartedBefore] = useState('')
   const [selectedIds, setSelectedIds] = useState<number[]>([])
-  const [preview, setPreview] = useState<{ record: Recording; url: string } | null>(null)
+  const [preview, setPreview] = useState<{ record: Recording; url: string; cursor: CursorSample[] } | null>(null)
+  const [cursor, setCursor] = useState<CursorSample | null>(null)
 
   const loadPolicy = useCallback(async () => {
     const value = await get<RecordingPolicy>('/recordings/policy')
@@ -180,7 +182,11 @@ export default function RecordingsPage() {
     try {
       const access = await get<AccessResponse>(`/recordings/${record.id}/access`, { download: download ? 1 : 0 })
       if (download) window.location.assign(access.url)
-      else setPreview({ record, url: access.url })
+      else {
+        const cursorTrack = await get<CursorSample[]>(`/recordings/${record.id}/cursor`)
+        setCursor(null)
+        setPreview({ record, url: access.url, cursor: Array.isArray(cursorTrack) ? cursorTrack : [] })
+      }
     } catch (error) {
       show(errorMessage(error), 'error')
     }
@@ -286,7 +292,7 @@ export default function RecordingsPage() {
         {records.total > records.page_size && <div className="flex items-center justify-end gap-2 border-t border-base-300 px-5 py-3"><button className="btn btn-outline btn-xs" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>上一页</button><span className="text-xs text-base-content/50">第 {page} 页</span><button className="btn btn-outline btn-xs" disabled={page * records.page_size >= records.total} onClick={() => setPage((value) => value + 1)}>下一页</button></div>}
       </div>
 
-      {preview && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-5"><div className="w-full max-w-5xl overflow-hidden rounded-md bg-[#101617] shadow-2xl"><div className="flex h-12 items-center border-b border-white/10 px-4 text-white"><Film size={16} className="mr-2 text-emerald-400" /><span className="min-w-0 flex-1 truncate text-sm">{preview.record.original_name}</span><button className="btn btn-ghost btn-sm text-white/60 hover:text-white" onClick={() => setPreview(null)}><X size={18} /></button></div><video className="max-h-[75vh] w-full bg-black" src={preview.url} controls autoPlay /></div></div>}
+      {preview && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-5"><div className="w-full max-w-5xl overflow-hidden rounded-md bg-[#101617] shadow-2xl"><div className="flex h-12 items-center border-b border-white/10 px-4 text-white"><Film size={16} className="mr-2 text-emerald-400" /><span className="min-w-0 flex-1 truncate text-sm">{preview.record.original_name}</span><button className="btn btn-ghost btn-sm text-white/60 hover:text-white" onClick={() => setPreview(null)}><X size={18} /></button></div><div className="relative bg-black"><video className="max-h-[75vh] w-full bg-black" src={preview.url} controls autoPlay onTimeUpdate={(event) => { const time = event.currentTarget.currentTime * 1000; let next: CursorSample | null = null; for (const sample of preview.cursor) { if (sample.t > time) break; next = sample } setCursor(next) }} />{cursor?.visible && <MousePointer2 aria-hidden className="pointer-events-none absolute z-10 text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)]" fill="black" size={25} style={{ left: `${cursor.x / 655.35}%`, top: `${cursor.y / 655.35}%`, transform: 'translate(-3px, -3px)' }} />}</div></div></div>}
     </section>
   )
 }

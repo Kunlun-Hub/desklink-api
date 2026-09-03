@@ -13,8 +13,9 @@ import (
 type Recording struct{}
 
 type recordingCompleteForm struct {
-	DurationMs int64  `json:"duration_ms"`
-	Sha256     string `json:"sha256"`
+	DurationMs  int64                           `json:"duration_ms"`
+	Sha256      string                          `json:"sha256"`
+	CursorTrack []service.RecordingCursorSample `json:"cursor_track"`
 }
 
 func (r *Recording) Policy(c *gin.Context) {
@@ -101,7 +102,7 @@ func (r *Recording) Complete(c *gin.Context) {
 		response.Fail(c, 101, err.Error())
 		return
 	}
-	if err = service.AllService.RecordingService.Complete(recording, form.DurationMs, form.Sha256); err != nil {
+	if err = service.AllService.RecordingService.Complete(recording, form.DurationMs, form.Sha256, form.CursorTrack); err != nil {
 		response.Fail(c, 101, err.Error())
 		return
 	}

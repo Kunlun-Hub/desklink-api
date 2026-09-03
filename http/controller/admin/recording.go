@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -98,6 +99,24 @@ func (r *Recording) Access(c *gin.Context) {
 		url += "&download=1"
 	}
 	response.Success(c, gin.H{"url": url, "expires_at": expiresAt})
+}
+
+func (r *Recording) CursorTrack(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.Fail(c, 101, "invalid recording id")
+		return
+	}
+	recording, err := service.AllService.RecordingService.Info(uint(id))
+	if err != nil {
+		response.Fail(c, 101, "recording not found")
+		return
+	}
+	track := json.RawMessage(recording.CursorTrack)
+	if len(track) == 0 || !json.Valid(track) {
+		track = json.RawMessage("[]")
+	}
+	response.Success(c, track)
 }
 
 func (r *Recording) Delete(c *gin.Context) {

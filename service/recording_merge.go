@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -88,6 +89,25 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 		return nil
 	}
 	primary := segments[0]
+	mergedCursorTrack := make([]RecordingCursorSample, 0)
+	trackOffset := int64(0)
+	for _, segment := range segments {
+		if segment.CursorTrack != "" {
+			var samples []RecordingCursorSample
+			if err := json.Unmarshal([]byte(segment.CursorTrack), &samples); err != nil {
+				return fmt.Errorf("decode recording cursor track: %w", err)
+			}
+			for _, sample := range samples {
+				sample.Time += trackOffset
+				mergedCursorTrack = append(mergedCursorTrack, sample)
+			}
+		}
+		trackOffset += segment.DurationMs
+	}
+	cursorTrackJSON, err := json.Marshal(mergedCursorTrack)
+	if err != nil {
+		return err
+	}
 
 	tempDir, err := os.MkdirTemp("", "desklink-recording-merge-")
 	if err != nil {
@@ -158,6 +178,7 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 		"storage_name": mergedName, "preview_storage_name": "", "container": container,
 		"codec": codec, "size": stat.Size(), "duration_ms": duration,
 		"sha256": hex.EncodeToString(hash.Sum(nil)), "status": model.RecordingStatusComplete,
+		"cursor_track": string(cursorTrackJSON),
 	}).Error; err != nil {
 		return err
 	}
