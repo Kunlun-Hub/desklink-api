@@ -320,6 +320,9 @@ func TestRecordingSessionMergeReencodesMixedCodecs(t *testing.T) {
 	if merged.Codec != "h264" || merged.Container != "mp4" || merged.DurationMs < 1900 {
 		t.Fatalf("unexpected mixed-codec merge: %#v", merged)
 	}
+	if output, err := exec.Command("ffmpeg", "-v", "error", "-i", service.FilePath(merged), "-map", "0:v:0", "-f", "null", "-").CombinedOutput(); err != nil || len(output) != 0 {
+		t.Fatalf("merged recording did not decode cleanly: %v: %s", err, output)
+	}
 }
 
 func TestMergeExistingSessionsFindsSessionID(t *testing.T) {

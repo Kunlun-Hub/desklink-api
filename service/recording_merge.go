@@ -204,8 +204,8 @@ func (s *RecordingService) reencodeRecordingSegments(ctx context.Context, segmen
 	}
 	for index, segmentPath := range segmentPaths {
 		normalizedPath := filepath.Join(tempDir, fmt.Sprintf("normalized-%04d.ts", index))
-		filter := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1", width, height, width, height)
-		args := []string{"-hide_banner", "-loglevel", "error", "-y", "-i", segmentPath, "-map", "0:v:0", "-an", "-vf", filter, "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-f", "mpegts", normalizedPath}
+		filter := fmt.Sprintf("fps=30,scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1,setpts=N/(30*TB)", width, height, width, height)
+		args := []string{"-hide_banner", "-loglevel", "error", "-y", "-i", segmentPath, "-map", "0:v:0", "-an", "-vf", filter, "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-fps_mode", "cfr", "-f", "mpegts", normalizedPath}
 		if output, runErr := exec.CommandContext(ctx, s.ffmpegPath(), args...).CombinedOutput(); runErr != nil {
 			_ = listFile.Close()
 			return fmt.Errorf("normalize segment %d: %v (%s)", index, runErr, strings.TrimSpace(string(output)))
