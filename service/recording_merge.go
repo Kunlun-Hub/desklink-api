@@ -67,6 +67,17 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 	if key == "" {
 		return nil
 	}
+	var activeSegments int64
+	if err := DB.Model(&model.SessionRecording{}).
+		Where("peer_id = ? AND from_peer = ? AND session_id = ? AND status IN ?",
+			recording.PeerId, recording.FromPeer, recording.SessionId,
+			[]string{model.RecordingStatusUploading, model.RecordingStatusTranscoding}).
+		Count(&activeSegments).Error; err != nil {
+		return err
+	}
+	if activeSegments > 0 {
+		return nil
+	}
 	var segments []*model.SessionRecording
 	if err := DB.Where("peer_id = ? AND from_peer = ? AND session_id = ? AND status = ?",
 		recording.PeerId, recording.FromPeer, recording.SessionId, model.RecordingStatusComplete).

@@ -62,7 +62,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: ${DESKLINK_API_IMAGE:-ohoimager/desklink-api:1.4.9-session-merge-v7}
+    image: ${DESKLINK_API_IMAGE:-ohoimager/desklink-api:1.4.9-session-merge-v8}
     container_name: desklink-api
     network_mode: host
     depends_on:

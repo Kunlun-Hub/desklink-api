@@ -10,7 +10,7 @@ community project.
 ## Current Production Snapshot
 
 - Host: `10.202.22.90`; deployment directory: `/opt/desklink`
-- API image: `ohoimager/desklink-api:1.4.9-session-merge-v7`
+- API image: `ohoimager/desklink-api:1.4.9-session-merge-v8`
 - Docker Hub manifest digest:
   `sha256:b69bf8af6c8cb10e146f16e2ce451c90f6d0b5a7a2b80c97b2cfc60c88042c66`
 - Server image: `ohoimager/desklink-server:1.4.9-secure-tcp`
@@ -71,6 +71,8 @@ is normalized to one resolution and re-encoded as H.264 before concatenation;
 this is required because display switches can change codec or dimensions. The
 earliest row remains as the audit record and duration/size/hash are recomputed.
 Do not merge rows with an empty session ID.
+Do not merge while any segment in the same session is still uploading or
+transcoding; the final completed segment schedules the merge again.
 
 FTP/S3 secrets are AES-GCM encrypted using a key derived from
 `RUSTDESK_API_JWT_KEY`. The admin API returns only `has_password` and

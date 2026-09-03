@@ -348,3 +348,30 @@ func TestMergeExistingSessionsFindsSessionID(t *testing.T) {
 		t.Fatalf("unexpected mergeable session keys: %#v", keys)
 	}
 }
+
+func TestRecordingSessionMergeWaitsForActiveSegment(t *testing.T) {
+	service := setupRecordingTest(t)
+	complete := &model.SessionRecording{
+		UploadId: "active-complete", UploadTokenHash: "unused", PeerId: "active-peer", FromPeer: "controller",
+		SessionId: "active-session", OriginalName: "complete.mp4", StorageName: "complete.mp4",
+		StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete,
+	}
+	active := &model.SessionRecording{
+		UploadId: "active-upload", UploadTokenHash: "unused", PeerId: "active-peer", FromPeer: "controller",
+		SessionId: "active-session", OriginalName: "active.mp4", StorageName: "active.mp4",
+		StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusUploading,
+	}
+	if err := DB.Create([]*model.SessionRecording{complete, active}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := service.MergeSession(complete); err != nil {
+		t.Fatal(err)
+	}
+	var count int64
+	if err := DB.Model(&model.SessionRecording{}).Where("session_id = ?", "active-session").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("active session segments were merged early: %d", count)
+	}
+}
