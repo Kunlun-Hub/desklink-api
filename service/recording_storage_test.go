@@ -224,3 +224,27 @@ func TestRecordingSessionMerge(t *testing.T) {
 		t.Fatalf("duplicate segment still exists: %v", err)
 	}
 }
+
+func TestMergeExistingSessionsFindsSessionID(t *testing.T) {
+	service := setupRecordingTest(t)
+	first := &model.SessionRecording{
+		UploadId: "scan-first", UploadTokenHash: "unused", PeerId: "scan-peer", FromPeer: "scan-controller",
+		SessionId: "scan-session", OriginalName: "first.mp4", StorageName: "scan-first.mp4",
+		StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete,
+	}
+	second := &model.SessionRecording{
+		UploadId: "scan-second", UploadTokenHash: "unused", PeerId: "scan-peer", FromPeer: "scan-controller",
+		SessionId: "scan-session", OriginalName: "second.mp4", StorageName: "scan-second.mp4",
+		StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete,
+	}
+	if err := DB.Create([]*model.SessionRecording{first, second}).Error; err != nil {
+		t.Fatal(err)
+	}
+	keys, err := service.mergeableSessionKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 1 || keys[0].PeerId != "scan-peer" || keys[0].FromPeer != "scan-controller" || keys[0].Session != "scan-session" {
+		t.Fatalf("unexpected mergeable session keys: %#v", keys)
+	}
+}

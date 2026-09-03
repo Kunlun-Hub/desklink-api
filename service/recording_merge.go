@@ -24,6 +24,12 @@ var recordingMergeTimers = struct {
 	values map[string]*time.Timer
 }{values: make(map[string]*time.Timer)}
 
+type recordingSessionKey struct {
+	PeerId   string
+	FromPeer string
+	Session  string `gorm:"column:session_id"`
+}
+
 func recordingMergeKey(recording *model.SessionRecording) string {
 	if recording == nil || recording.SessionId == "" || recording.PeerId == "" || recording.FromPeer == "" {
 		return ""
@@ -191,18 +197,19 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 // MergeExistingSessions repairs segments created before session merging was
 // enabled. It runs once in the background after startup; future segments use
 // scheduleSessionMerge instead.
-func (s *RecordingService) MergeExistingSessions() {
-	type sessionKey struct {
-		PeerId   string
-		FromPeer string
-		Session  string
-	}
-	var keys []sessionKey
-	if err := DB.Model(&model.SessionRecording{}).
+func (s *RecordingService) mergeableSessionKeys() ([]recordingSessionKey, error) {
+	var keys []recordingSessionKey
+	err := DB.Model(&model.SessionRecording{}).
 		Select("peer_id, from_peer, session_id").
 		Where("status = ? AND session_id <> '' AND from_peer <> ''", model.RecordingStatusComplete).
 		Group("peer_id, from_peer, session_id").
-		Having("COUNT(*) > 1").Find(&keys).Error; err != nil {
+		Having("COUNT(*) > 1").Find(&keys).Error
+	return keys, err
+}
+
+func (s *RecordingService) MergeExistingSessions() {
+	keys, err := s.mergeableSessionKeys()
+	if err != nil {
 		Logger.Warnf("recording session merge scan failed: %v", err)
 		return
 	}
