@@ -187,3 +187,33 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 	}
 	return nil
 }
+
+// MergeExistingSessions repairs segments created before session merging was
+// enabled. It runs once in the background after startup; future segments use
+// scheduleSessionMerge instead.
+func (s *RecordingService) MergeExistingSessions() {
+	type sessionKey struct {
+		PeerId   string
+		FromPeer string
+		Session  string
+	}
+	var keys []sessionKey
+	if err := DB.Model(&model.SessionRecording{}).
+		Select("peer_id, from_peer, session_id").
+		Where("status = ? AND session_id <> '' AND from_peer <> ''", model.RecordingStatusComplete).
+		Group("peer_id, from_peer, session_id").
+		Having("COUNT(*) > 1").Find(&keys).Error; err != nil {
+		Logger.Warnf("recording session merge scan failed: %v", err)
+		return
+	}
+	for _, key := range keys {
+		var recording model.SessionRecording
+		if err := DB.Where("peer_id = ? AND from_peer = ? AND session_id = ?", key.PeerId, key.FromPeer, key.Session).Order("started_at asc, id asc").First(&recording).Error; err != nil {
+			Logger.Warnf("recording session merge lookup failed: %v", err)
+			continue
+		}
+		if err := s.MergeSession(&recording); err != nil {
+			Logger.Warnf("recording historical session merge failed for %s: %v", key.Session, err)
+		}
+	}
+}

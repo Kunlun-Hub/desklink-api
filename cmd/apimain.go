@@ -216,6 +216,7 @@ func InitGlobal() {
 	global.LoginLimiter.RegisterProvider(utils.B64StringCaptchaProvider{})
 	DatabaseAutoUpdate()
 	service.StartRecordingMaintenance()
+	go service.AllService.RecordingService.MergeExistingSessions()
 }
 
 func DatabaseAutoUpdate() {
