@@ -12,7 +12,7 @@ community project.
 - Host: `10.202.22.90`; deployment directory: `/opt/desklink`
 - API image: `ohoimager/desklink-api:1.4.9-cursor-download`
 - Docker Hub manifest digest:
-  `sha256:b69bf8af6c8cb10e146f16e2ce451c90f6d0b5a7a2b80c97b2cfc60c88042c66`
+  `sha256:04a72b9af8e77d97ef1b1783b1970b6b98f54f1b20d9c44d773ac3ae2b1ab5f2`
 - Server image: `ohoimager/desklink-server:1.4.9-secure-tcp`
 - Database: MySQL 8.4, schema version `271`
 - Containers last verified healthy: `desklink-api`, `desklink-hbbs`,
