@@ -10,11 +10,11 @@ community project.
 ## Current Production Snapshot
 
 - Host: `10.202.22.90`; deployment directory: `/opt/desklink`
-- API image: `ohoimager/desklink-api:1.4.9-admin-cursor-v2`
+- API image: `ohoimager/desklink-api:1.4.9-cursor-download`
 - Docker Hub manifest digest:
   `sha256:b69bf8af6c8cb10e146f16e2ce451c90f6d0b5a7a2b80c97b2cfc60c88042c66`
 - Server image: `ohoimager/desklink-server:1.4.9-secure-tcp`
-- Database: MySQL 8.4, schema version `270`
+- Database: MySQL 8.4, schema version `271`
 - Containers last verified healthy: `desklink-api`, `desklink-hbbs`,
   `desklink-hbbr`, and `desklink-mysql`
 - Current recording storage selection: local `runtime/recordings`
