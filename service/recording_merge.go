@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +24,8 @@ var recordingMergeTimers = struct {
 	sync.Mutex
 	values map[string]*time.Timer
 }{values: make(map[string]*time.Timer)}
+
+var recordingMergeRun sync.Mutex
 
 type recordingSessionKey struct {
 	PeerId   string
@@ -58,6 +61,8 @@ func (s *RecordingService) scheduleSessionMerge(recording *model.SessionRecordin
 }
 
 func (s *RecordingService) MergeSession(recording *model.SessionRecording) error {
+	recordingMergeRun.Lock()
+	defer recordingMergeRun.Unlock()
 	key := recordingMergeKey(recording)
 	if key == "" {
 		return nil
@@ -87,6 +92,7 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 		return err
 	}
 	cleanups := make([]func(), 0, len(segments))
+	segmentPaths := make([]string, 0, len(segments))
 	for _, segment := range segments {
 		value, cleanup, materializeErr := s.MaterializeRecordingObject(segment, false)
 		if materializeErr != nil {
@@ -105,6 +111,7 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 			}
 			return err
 		}
+		segmentPaths = append(segmentPaths, value)
 		if _, err = fmt.Fprintf(listFile, "file '%s'\n", strings.ReplaceAll(value, "'", "'\\''")); err != nil {
 			_ = listFile.Close()
 			for _, clean := range cleanups {
@@ -129,13 +136,24 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 	copyArgs := []string{"-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-movflags", "+faststart", mergedPath}
 	codec := primary.Codec
 	container := primary.Container
-	if output, runErr := exec.CommandContext(ctx, s.ffmpegPath(), copyArgs...).CombinedOutput(); runErr != nil {
-		fallbackPath := filepath.Join(tempDir, primary.UploadId+".merged.mp4")
-		fallbackArgs := []string{"-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-an", "-movflags", "+faststart", fallbackPath}
-		if fallbackOutput, fallbackErr := exec.CommandContext(ctx, s.ffmpegPath(), fallbackArgs...).CombinedOutput(); fallbackErr != nil {
-			return fmt.Errorf("stream copy: %v (%s); re-encode: %v (%s)", runErr, strings.TrimSpace(string(output)), fallbackErr, strings.TrimSpace(string(fallbackOutput)))
+	canStreamCopy := true
+	for _, segment := range segments[1:] {
+		if segment.Codec != primary.Codec || segment.Container != primary.Container {
+			canStreamCopy = false
+			break
 		}
-		mergedPath = fallbackPath
+	}
+	var output []byte
+	var runErr error
+	if canStreamCopy {
+		output, runErr = exec.CommandContext(ctx, s.ffmpegPath(), copyArgs...).CombinedOutput()
+	} else {
+		runErr = errors.New("recording segments use different codecs or containers")
+	}
+	if runErr != nil {
+		if fallbackErr := s.reencodeRecordingSegments(ctx, segmentPaths, tempDir, mergedPath); fallbackErr != nil {
+			return fmt.Errorf("stream copy: %v (%s); re-encode: %w", runErr, strings.TrimSpace(string(output)), fallbackErr)
+		}
 		codec = "h264"
 		container = "mp4"
 	}
@@ -161,9 +179,9 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 	if err != nil {
 		return err
 	}
-	duration := int64(0)
-	for _, segment := range segments {
-		duration += segment.DurationMs
+	duration, err := s.probeRecordingDuration(ctx, mergedPath)
+	if err != nil {
+		return err
 	}
 	// Switch metadata first. If cleanup fails, the merged object remains the
 	// canonical playable copy and the old objects can be retried later.
@@ -200,6 +218,65 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 		return fmt.Errorf("merged recording cleanup: %w", cleanupErr)
 	}
 	return nil
+}
+
+func (s *RecordingService) reencodeRecordingSegments(ctx context.Context, segmentPaths []string, tempDir, mergedPath string) error {
+	if len(segmentPaths) == 0 {
+		return errors.New("recording segments are required")
+	}
+	dimensions, err := exec.CommandContext(ctx, "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", segmentPaths[0]).Output()
+	if err != nil {
+		return fmt.Errorf("probe segment dimensions: %w", err)
+	}
+	parts := strings.Split(strings.TrimSpace(string(dimensions)), "x")
+	if len(parts) != 2 {
+		return errors.New("invalid segment dimensions")
+	}
+	width, widthErr := strconv.Atoi(parts[0])
+	height, heightErr := strconv.Atoi(parts[1])
+	if widthErr != nil || heightErr != nil || width <= 0 || height <= 0 {
+		return errors.New("invalid segment dimensions")
+	}
+	width -= width % 2
+	height -= height % 2
+	listPath := filepath.Join(tempDir, "normalized.txt")
+	listFile, err := os.OpenFile(listPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	for index, segmentPath := range segmentPaths {
+		normalizedPath := filepath.Join(tempDir, fmt.Sprintf("normalized-%04d.ts", index))
+		filter := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1", width, height, width, height)
+		args := []string{"-hide_banner", "-loglevel", "error", "-y", "-i", segmentPath, "-map", "0:v:0", "-an", "-vf", filter, "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-f", "mpegts", normalizedPath}
+		if output, runErr := exec.CommandContext(ctx, s.ffmpegPath(), args...).CombinedOutput(); runErr != nil {
+			_ = listFile.Close()
+			return fmt.Errorf("normalize segment %d: %v (%s)", index, runErr, strings.TrimSpace(string(output)))
+		}
+		if _, err = fmt.Fprintf(listFile, "file '%s'\n", strings.ReplaceAll(normalizedPath, "'", "'\\''")); err != nil {
+			_ = listFile.Close()
+			return err
+		}
+	}
+	if err = listFile.Close(); err != nil {
+		return err
+	}
+	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-movflags", "+faststart", mergedPath}
+	if output, runErr := exec.CommandContext(ctx, s.ffmpegPath(), args...).CombinedOutput(); runErr != nil {
+		return fmt.Errorf("concat normalized segments: %v (%s)", runErr, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+func (s *RecordingService) probeRecordingDuration(ctx context.Context, recordingPath string) (int64, error) {
+	output, err := exec.CommandContext(ctx, "ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", recordingPath).Output()
+	if err != nil {
+		return 0, fmt.Errorf("probe merged recording duration: %w", err)
+	}
+	value, err := strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
+	if err != nil || value <= 0 {
+		return 0, errors.New("invalid merged recording duration")
+	}
+	return int64(value * 1000), nil
 }
 
 // MergeExistingSessions repairs segments created before session merging was

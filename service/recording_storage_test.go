@@ -279,6 +279,49 @@ func TestRecordingSessionMergeWithRelativeStoragePath(t *testing.T) {
 	}
 }
 
+func TestRecordingSessionMergeReencodesMixedCodecs(t *testing.T) {
+	service := setupRecordingTest(t)
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg is not installed")
+	}
+	create := func(name, codec, color, size string) {
+		args := []string{"-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=" + color + ":s=" + size + ":r=10", "-t", "1", "-an", "-c:v", codec}
+		if codec == "libx264" {
+			args = append(args, "-pix_fmt", "yuv420p")
+		}
+		args = append(args, filepath.Join(service.storagePath(), name))
+		if output, err := exec.Command("ffmpeg", args...).CombinedOutput(); err != nil {
+			t.Fatalf("create mixed codec segment: %v: %s", err, output)
+		}
+	}
+	create("mixed-first.mp4", "libx264", "red", "320x240")
+	create("mixed-second.webm", "libvpx-vp9", "blue", "640x360")
+	segments := []*model.SessionRecording{
+		{UploadId: "mixed-first", UploadTokenHash: "unused", PeerId: "mixed-peer", FromPeer: "controller", SessionId: "mixed-session", OriginalName: "mixed-first.mp4", StorageName: "mixed-first.mp4", StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete},
+		{UploadId: "mixed-second", UploadTokenHash: "unused", PeerId: "mixed-peer", FromPeer: "controller", SessionId: "mixed-session", OriginalName: "mixed-second.webm", StorageName: "mixed-second.webm", StorageBackend: recordingStorageLocal, Container: "webm", Codec: "vp9", Status: model.RecordingStatusComplete},
+	}
+	for _, segment := range segments {
+		info, err := os.Stat(service.FilePath(segment))
+		if err != nil {
+			t.Fatal(err)
+		}
+		segment.Size = info.Size()
+	}
+	if err := DB.Create(&segments).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := service.MergeSession(segments[0]); err != nil {
+		t.Fatal(err)
+	}
+	merged, err := service.Info(segments[0].Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if merged.Codec != "h264" || merged.Container != "mp4" || merged.DurationMs < 1900 {
+		t.Fatalf("unexpected mixed-codec merge: %#v", merged)
+	}
+}
+
 func TestMergeExistingSessionsFindsSessionID(t *testing.T) {
 	service := setupRecordingTest(t)
 	first := &model.SessionRecording{
