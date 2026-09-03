@@ -37,6 +37,9 @@ type SessionRecording struct {
 	StorageBackend     string `gorm:"size:16;default:'local';not null;index" json:"storage_backend"`
 	StorageSettingId   uint   `gorm:"default:0;not null;index" json:"-"`
 	PreviewStorageName string `gorm:"size:255;default:'';not null" json:"-"`
+	CursorStorageName  string `gorm:"size:255;default:'';not null" json:"-"`
+	CursorRenderStatus string `gorm:"size:16;default:'';not null" json:"cursor_render_status"`
+	CursorRenderError  string `gorm:"size:512;default:'';not null" json:"cursor_render_error"`
 	Container          string `gorm:"size:16;not null" json:"container"`
 	Codec              string `gorm:"size:16;default:'';not null" json:"codec"`
 	Status             string `gorm:"size:16;index;not null" json:"status"`
@@ -47,6 +50,7 @@ type SessionRecording struct {
 	Sha256             string `gorm:"size:64;default:'';not null" json:"sha256"`
 	ErrorMessage       string `gorm:"size:512;default:'';not null" json:"error_message"`
 	CursorTrack        string `gorm:"type:longtext" json:"-"`
+	CursorAvailable    bool   `gorm:"-" json:"cursor_available"`
 	TimeModel
 }
 

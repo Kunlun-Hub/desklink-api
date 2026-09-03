@@ -649,6 +649,23 @@ func (s *RecordingService) MaterializeRecordingObject(recording *model.SessionRe
 	}, nil
 }
 
+func (s *RecordingService) materializeRecordingNamedObject(recording *model.SessionRecording, name string) (string, func(), error) {
+	store, _, err := s.objectStoreForRecording(recording)
+	if err != nil {
+		return "", func() {}, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
+	value, cleanup, err := store.Materialize(ctx, name)
+	if err != nil {
+		cancel()
+		return "", func() {}, err
+	}
+	return value, func() {
+		cleanup()
+		cancel()
+	}, nil
+}
+
 func (s *RecordingService) deleteRecordingObject(recording *model.SessionRecording, name string) error {
 	store, _, err := s.objectStoreForRecording(recording)
 	if err != nil {

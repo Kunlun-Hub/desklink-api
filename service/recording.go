@@ -431,6 +431,9 @@ func (s *RecordingService) List(page, pageSize uint, peerId, fromPeer, status st
 	}
 	tx.Count(&res.Total)
 	tx.Order("id desc").Scopes(Paginate(page, pageSize)).Find(&res.Recordings)
+	for _, recording := range res.Recordings {
+		recording.CursorAvailable = recording.CursorTrack != "" && recording.CursorTrack != "[]"
+	}
 	return res
 }
 
@@ -460,6 +463,12 @@ func (s *RecordingService) Delete(recording *model.SessionRecording) error {
 			return err
 		}
 		_ = os.Remove(s.PreviewFilePath(recording))
+	}
+	if recording.CursorStorageName != "" {
+		if err := s.deleteRecordingObject(recording, recording.CursorStorageName); err != nil {
+			return err
+		}
+		_ = os.Remove(filepath.Join(s.storagePath(), recording.CursorStorageName))
 	}
 	return DB.Delete(recording).Error
 }
@@ -519,6 +528,9 @@ func StartRecordingMaintenance() {
 		}
 	}
 	run()
+	_ = DB.Model(&model.SessionRecording{}).Where("cursor_render_status = ?", "generating").Updates(map[string]interface{}{
+		"cursor_render_status": "failed", "cursor_render_error": "generation was interrupted; retry the download",
+	}).Error
 	var pending []*model.SessionRecording
 	if err := DB.Where("status = ?", model.RecordingStatusTranscoding).Find(&pending).Error; err == nil {
 		for _, recording := range pending {

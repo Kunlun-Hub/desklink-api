@@ -79,6 +79,15 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 	if activeSegments > 0 {
 		return nil
 	}
+	if err := DB.Model(&model.SessionRecording{}).
+		Where("peer_id = ? AND from_peer = ? AND session_id = ? AND cursor_render_status = ?",
+			recording.PeerId, recording.FromPeer, recording.SessionId, recordingCursorGenerating).
+		Count(&activeSegments).Error; err != nil {
+		return err
+	}
+	if activeSegments > 0 {
+		return nil
+	}
 	var segments []*model.SessionRecording
 	if err := DB.Where("peer_id = ? AND from_peer = ? AND session_id = ? AND status = ?",
 		recording.PeerId, recording.FromPeer, recording.SessionId, model.RecordingStatusComplete).
@@ -176,6 +185,7 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 	// canonical playable copy and the old objects can be retried later.
 	if err = DB.Model(primary).Updates(map[string]interface{}{
 		"storage_name": mergedName, "preview_storage_name": "", "container": container,
+		"cursor_storage_name": "", "cursor_render_status": "", "cursor_render_error": "",
 		"codec": codec, "size": stat.Size(), "duration_ms": duration,
 		"sha256": hex.EncodeToString(hash.Sum(nil)), "status": model.RecordingStatusComplete,
 		"cursor_track": string(cursorTrackJSON),
@@ -191,6 +201,11 @@ func (s *RecordingService) MergeSession(recording *model.SessionRecording) error
 		}
 		if segment.PreviewStorageName != "" && segment.PreviewStorageName != mergedName {
 			if err = s.deleteRecordingObject(segment, segment.PreviewStorageName); err != nil && cleanupErr == nil {
+				cleanupErr = err
+			}
+		}
+		if segment.CursorStorageName != "" && segment.CursorStorageName != mergedName {
+			if err = s.deleteRecordingObject(segment, segment.CursorStorageName); err != nil && cleanupErr == nil {
 				cleanupErr = err
 			}
 		}

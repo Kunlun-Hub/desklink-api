@@ -84,12 +84,25 @@ func (r *Recording) Access(c *gin.Context) {
 		response.Fail(c, 101, "invalid recording id")
 		return
 	}
-	if _, err = service.AllService.RecordingService.Info(uint(id)); err != nil {
+	download := c.Query("download") == "1"
+	cursor := download && c.Query("cursor") == "1"
+	recording, err := service.AllService.RecordingService.Info(uint(id))
+	if err != nil {
 		response.Fail(c, 101, "recording not found")
 		return
 	}
-	download := c.Query("download") == "1"
-	token, expiresAt, err := service.CreateRecordingAccessToken(uint(id), download)
+	if cursor {
+		status, renderErr := service.AllService.RecordingService.StartCursorRender(recording, c.Query("retry") == "1")
+		if renderErr != nil {
+			response.Fail(c, 101, renderErr.Error())
+			return
+		}
+		if status != "ready" {
+			response.Success(c, gin.H{"status": status, "error": recording.CursorRenderError})
+			return
+		}
+	}
+	token, expiresAt, err := service.CreateRecordingAccessToken(uint(id), download, cursor)
 	if err != nil {
 		response.Fail(c, 101, err.Error())
 		return
@@ -98,7 +111,10 @@ func (r *Recording) Access(c *gin.Context) {
 	if download {
 		url += "&download=1"
 	}
-	response.Success(c, gin.H{"url": url, "expires_at": expiresAt})
+	if cursor {
+		url += "&cursor=1"
+	}
+	response.Success(c, gin.H{"status": "ready", "url": url, "expires_at": expiresAt})
 }
 
 func (r *Recording) CursorTrack(c *gin.Context) {

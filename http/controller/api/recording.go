@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -124,7 +125,9 @@ func (r *Recording) Cancel(c *gin.Context) {
 
 func (r *Recording) Content(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil || !service.VerifyRecordingAccessToken(c.Query("token"), uint(id), c.Query("download") == "1") {
+	download := c.Query("download") == "1"
+	cursor := download && c.Query("cursor") == "1"
+	if err != nil || !service.VerifyRecordingAccessToken(c.Query("token"), uint(id), download, cursor) {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
@@ -133,15 +136,26 @@ func (r *Recording) Content(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	if c.Query("download") == "1" {
-		c.Header("Content-Disposition", "attachment; filename=\""+strings.ReplaceAll(recording.OriginalName, "\"", "")+"\"")
+	if download {
+		name := strings.ReplaceAll(recording.OriginalName, "\"", "")
+		if cursor {
+			name = strings.TrimSuffix(name, filepath.Ext(name)) + "-with-cursor.mp4"
+		}
+		c.Header("Content-Disposition", "attachment; filename=\""+name+"\"")
 	}
 	contentType := map[string]string{"webm": "video/webm", "mp4": "video/mp4"}[recording.Container]
-	preview := c.Query("download") != "1" && recording.PreviewStorageName != ""
+	preview := !download && recording.PreviewStorageName != ""
 	if preview {
 		contentType = "video/mp4"
 	}
-	path, cleanup, err := service.AllService.RecordingService.MaterializeRecordingObject(recording, preview)
+	var path string
+	var cleanup func()
+	if cursor {
+		path, cleanup, err = service.AllService.RecordingService.MaterializeCursorRecording(recording)
+		contentType = "video/mp4"
+	} else {
+		path, cleanup, err = service.AllService.RecordingService.MaterializeRecordingObject(recording, preview)
+	}
 	if err != nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		return

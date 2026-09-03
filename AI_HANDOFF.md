@@ -49,6 +49,12 @@ tracks while merging segments, and the admin player overlays a cursor according
 to `video.currentTime`. Recordings created before schema version 270 have no
 track and cannot display a historical cursor.
 
+Admins can also request a downloadable MP4 with the cursor burned in. The API
+generates it asynchronously with FFmpeg and ASS vector events, caches the result
+in the recording's original storage backend, and deletes it with the source
+recording. `cursor_render_status` drives the UI polling state. Session merging
+waits for an active cursor render and is rescheduled when rendering finishes.
+
 Do not move ID/Relay protocol behavior into this repository. That belongs to
 `/root/DeskLink Server`. Client heartbeat and recording uploads belong to
 `/root/rustdesk`.

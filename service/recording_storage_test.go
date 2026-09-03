@@ -378,3 +378,24 @@ func TestRecordingSessionMergeWaitsForActiveSegment(t *testing.T) {
 		t.Fatalf("active session segments were merged early: %d", count)
 	}
 }
+
+func TestRecordingSessionMergeWaitsForCursorRender(t *testing.T) {
+	service := setupRecordingTest(t)
+	segments := []*model.SessionRecording{
+		{UploadId: "render-first", UploadTokenHash: "unused", PeerId: "render-peer", FromPeer: "controller", SessionId: "render-session", OriginalName: "first.mp4", StorageName: "first.mp4", StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete, CursorRenderStatus: recordingCursorGenerating},
+		{UploadId: "render-second", UploadTokenHash: "unused", PeerId: "render-peer", FromPeer: "controller", SessionId: "render-session", OriginalName: "second.mp4", StorageName: "second.mp4", StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264", Status: model.RecordingStatusComplete},
+	}
+	if err := DB.Create(&segments).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := service.MergeSession(segments[0]); err != nil {
+		t.Fatal(err)
+	}
+	var count int64
+	if err := DB.Model(&model.SessionRecording{}).Where("session_id = ?", "render-session").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("session was merged while cursor rendering was active: %d", count)
+	}
+}

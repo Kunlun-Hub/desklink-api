@@ -34,9 +34,10 @@ interface Recording {
   duration_ms: number
   started_at: number
   completed_at: number
+  cursor_available: boolean
 }
 
-interface AccessResponse { url: string; expires_at: number }
+interface AccessResponse { status: 'generating' | 'ready' | 'failed'; url?: string; expires_at?: number; error?: string }
 interface CursorSample { t: number; x: number; y: number; visible: boolean }
 
 type StorageBackend = 'local' | 'ftp' | 'nfs' | 'smb' | 's3'
@@ -106,6 +107,7 @@ export default function RecordingsPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [preview, setPreview] = useState<{ record: Recording; url: string; cursor: CursorSample[] } | null>(null)
   const [cursor, setCursor] = useState<CursorSample | null>(null)
+  const [cursorDownloads, setCursorDownloads] = useState<number[]>([])
 
   const loadPolicy = useCallback(async () => {
     const value = await get<RecordingPolicy>('/recordings/policy')
@@ -178,16 +180,24 @@ export default function RecordingsPage() {
     }
   }
 
-  const requestAccess = async (record: Recording, download: boolean) => {
+  const requestAccess = async (record: Recording, download: boolean, withCursor = false, polling = false) => {
     try {
-      const access = await get<AccessResponse>(`/recordings/${record.id}/access`, { download: download ? 1 : 0 })
-      if (download) window.location.assign(access.url)
-      else {
+      const access = await get<AccessResponse>(`/recordings/${record.id}/access`, { download: download ? 1 : 0, cursor: withCursor ? 1 : undefined, retry: withCursor && !polling ? 1 : undefined })
+      if (download && withCursor && access.status === 'generating') {
+        setCursorDownloads((ids) => ids.includes(record.id) ? ids : [...ids, record.id])
+        window.setTimeout(() => void requestAccess(record, true, true, true), 2000)
+      } else if (download) {
+        setCursorDownloads((ids) => ids.filter((id) => id !== record.id))
+        if (!access.url) throw new Error(access.error || '录像下载文件尚未生成')
+        window.location.assign(access.url)
+      } else {
+        if (!access.url) throw new Error('录像预览地址不可用')
         const cursorTrack = await get<CursorSample[]>(`/recordings/${record.id}/cursor`)
         setCursor(null)
         setPreview({ record, url: access.url, cursor: Array.isArray(cursorTrack) ? cursorTrack : [] })
       }
     } catch (error) {
+      setCursorDownloads((ids) => ids.filter((id) => id !== record.id))
       show(errorMessage(error), 'error')
     }
   }
@@ -284,7 +294,7 @@ export default function RecordingsPage() {
           <table className="table table-sm">
             <thead><tr><th><input type="checkbox" className="checkbox checkbox-sm" aria-label="选择当前页" checked={records.list.length > 0 && records.list.every((record) => selectedIds.includes(record.id))} onChange={(event) => setSelectedIds(event.target.checked ? records.list.map((record) => record.id) : [])} /></th><th>开始时间</th><th>被控设备</th><th>控制方</th><th>时长</th><th>格式</th><th>大小</th><th>状态</th><th className="text-right">操作</th></tr></thead>
             <tbody>
-              {records.list.map((record) => <tr key={record.id}><td><input type="checkbox" className="checkbox checkbox-sm" aria-label={`选择录像 ${record.id}`} checked={selectedIds.includes(record.id)} onChange={() => setSelectedIds((ids) => ids.includes(record.id) ? ids.filter((id) => id !== record.id) : [...ids, record.id])} /></td><td className="whitespace-nowrap">{formatTime(record.started_at)}</td><td className="font-medium">{record.peer_id}</td><td><span className="block">{record.from_name || record.from_peer || '-'}</span>{record.from_name && record.from_peer && <span className="block text-xs text-base-content/40">{record.from_peer}</span>}</td><td>{formatDuration(record.duration_ms)}</td><td><span className="badge badge-ghost badge-sm uppercase">{record.codec || record.container}</span></td><td>{formatBytes(record.size)}</td><td><span className={`badge badge-sm ${record.status === 'complete' ? 'badge-success badge-soft' : record.status === 'failed' ? 'badge-error badge-soft' : 'badge-warning badge-soft'}`}>{record.status === 'complete' ? '已完成' : record.status === 'failed' ? '失败' : record.status === 'transcoding' ? '转码中' : '上传中'}</span></td><td><div className="flex justify-end gap-1"><button className="btn btn-ghost btn-xs" title="预览" disabled={record.status !== 'complete'} onClick={() => void requestAccess(record, false)}><Play size={14} /></button><button className="btn btn-ghost btn-xs" title="下载原始文件" disabled={record.status === 'uploading'} onClick={() => void requestAccess(record, true)}><Download size={14} /></button><button className="btn btn-ghost btn-xs text-error" title="删除" onClick={() => void deleteRecording(record)}><Trash2 size={14} /></button></div></td></tr>)}
+              {records.list.map((record) => <tr key={record.id}><td><input type="checkbox" className="checkbox checkbox-sm" aria-label={`选择录像 ${record.id}`} checked={selectedIds.includes(record.id)} onChange={() => setSelectedIds((ids) => ids.includes(record.id) ? ids.filter((id) => id !== record.id) : [...ids, record.id])} /></td><td className="whitespace-nowrap">{formatTime(record.started_at)}</td><td className="font-medium">{record.peer_id}</td><td><span className="block">{record.from_name || record.from_peer || '-'}</span>{record.from_name && record.from_peer && <span className="block text-xs text-base-content/40">{record.from_peer}</span>}</td><td>{formatDuration(record.duration_ms)}</td><td><span className="badge badge-ghost badge-sm uppercase">{record.codec || record.container}</span></td><td>{formatBytes(record.size)}</td><td><span className={`badge badge-sm ${record.status === 'complete' ? 'badge-success badge-soft' : record.status === 'failed' ? 'badge-error badge-soft' : 'badge-warning badge-soft'}`}>{record.status === 'complete' ? '已完成' : record.status === 'failed' ? '失败' : record.status === 'transcoding' ? '转码中' : '上传中'}</span></td><td><div className="flex justify-end gap-1"><button className="btn btn-ghost btn-xs" title="预览" disabled={record.status !== 'complete'} onClick={() => void requestAccess(record, false)}><Play size={14} /></button><button className="btn btn-ghost btn-xs" title="下载原始文件" disabled={record.status === 'uploading'} onClick={() => void requestAccess(record, true)}><Download size={14} /></button><button className="btn btn-ghost btn-xs" title={record.cursor_available ? '下载含鼠标录像' : '此录像没有鼠标轨迹'} disabled={record.status !== 'complete' || !record.cursor_available || cursorDownloads.includes(record.id)} onClick={() => void requestAccess(record, true, true)}>{cursorDownloads.includes(record.id) ? <span className="loading loading-spinner loading-xs" /> : <MousePointer2 size={14} />}</button><button className="btn btn-ghost btn-xs text-error" title="删除" onClick={() => void deleteRecording(record)}><Trash2 size={14} /></button></div></td></tr>)}
               {!records.list.length && <tr><td colSpan={9}><div className="flex flex-col items-center gap-2 py-12 text-base-content/35"><Film size={30} strokeWidth={1.4} /><span className="text-sm">暂无会话录像</span></div></td></tr>}
             </tbody>
           </table>

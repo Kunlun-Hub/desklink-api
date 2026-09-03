@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,6 +19,69 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+func TestRenderCursorRecordingFile(t *testing.T) {
+	service := setupRecordingTest(t)
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg is not installed")
+	}
+	source := filepath.Join(service.storagePath(), "cursor-source.mp4")
+	if output, err := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+		"-f", "lavfi", "-i", "color=c=white:s=320x240:r=10", "-t", "1", "-an",
+		"-c:v", "libx264", "-pix_fmt", "yuv420p", source).CombinedOutput(); err != nil {
+		t.Fatalf("create cursor source: %v: %s", err, output)
+	}
+	recording := &model.SessionRecording{
+		UploadId: "cursor-render", UploadTokenHash: "unused", PeerId: "peer", OriginalName: "recording.mp4",
+		StorageName: "cursor-source.mp4", StorageBackend: recordingStorageLocal, Container: "mp4", Codec: "h264",
+		Status: model.RecordingStatusComplete, DurationMs: 1000,
+		CursorTrack: `[{"t":0,"x":1000,"y":1000,"visible":true},{"t":500,"x":50000,"y":40000,"visible":true}]`,
+	}
+	if err := DB.Create(recording).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := service.renderCursorRecordingFile(recording); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := service.Info(recording.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.CursorRenderStatus != recordingCursorReady || stored.CursorStorageName == "" {
+		t.Fatalf("cursor recording was not marked ready: %#v", stored)
+	}
+	path, cleanup, err := service.MaterializeCursorRecording(stored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	if info, err := os.Stat(path); err != nil || info.Size() == 0 {
+		t.Fatalf("cursor recording is missing: %v", err)
+	}
+	if output, err := exec.Command("ffmpeg", "-v", "error", "-i", path, "-map", "0:v:0", "-f", "null", "-").CombinedOutput(); err != nil || len(output) != 0 {
+		t.Fatalf("cursor recording did not decode cleanly: %v: %s", err, output)
+	}
+	if err := service.Delete(stored); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(service.storagePath(), stored.CursorStorageName)); !os.IsNotExist(err) {
+		t.Fatalf("cursor recording remains after deletion: %v", err)
+	}
+}
+
+func TestRecordingAccessTokenSeparatesCursorDownload(t *testing.T) {
+	setupRecordingTest(t)
+	token, _, err := CreateRecordingAccessToken(42, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !VerifyRecordingAccessToken(token, 42, true, true) {
+		t.Fatal("cursor download token should be valid for its intended use")
+	}
+	if VerifyRecordingAccessToken(token, 42, true, false) || VerifyRecordingAccessToken(token, 42, false, false) {
+		t.Fatal("cursor download token was accepted for a different content type")
+	}
+}
 
 func setupRecordingTest(t *testing.T) *RecordingService {
 	t.Helper()
