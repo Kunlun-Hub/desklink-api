@@ -5,6 +5,7 @@ type AgentMetricSample struct {
 	Id           uint    `gorm:"primaryKey" json:"id"`
 	PeerId       string  `gorm:"size:64;index;not null" json:"peer_id"`
 	Timestamp    int64   `gorm:"index;not null" json:"timestamp"`
+	CpuModel     string  `gorm:"size:255;default:'';not null" json:"cpu_model"`
 	CpuUsage     float64 `gorm:"default:0;not null" json:"cpu_usage"`
 	MemoryTotal  uint64  `gorm:"default:0;not null" json:"memory_total"`
 	MemoryUsed   uint64  `gorm:"default:0;not null" json:"memory_used"`

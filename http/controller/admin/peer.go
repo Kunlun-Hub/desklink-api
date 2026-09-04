@@ -180,6 +180,7 @@ func (ct *Peer) Update(c *gin.Context) {
 	existing := service.AllService.PeerService.InfoByRowId(f.RowId)
 	if existing.RowId > 0 {
 		u.CpuUsage = existing.CpuUsage
+		u.CpuModel = existing.CpuModel
 		u.MemoryTotal = existing.MemoryTotal
 		u.MemoryUsed = existing.MemoryUsed
 		u.MemoryUsage = existing.MemoryUsage

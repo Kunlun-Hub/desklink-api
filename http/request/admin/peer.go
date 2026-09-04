@@ -6,6 +6,7 @@ type PeerForm struct {
 	RowId    uint   `json:"row_id" `
 	Id       string `json:"id"`
 	Cpu      string `json:"cpu"`
+	CpuModel string `json:"cpu_model"`
 	Hostname string `json:"hostname"`
 	Memory   string `json:"memory"`
 	Os       string `json:"os"`
@@ -26,6 +27,7 @@ func (f *PeerForm) ToPeer() *model.Peer {
 		RowId:    f.RowId,
 		Id:       f.Id,
 		Cpu:      f.Cpu,
+		CpuModel: f.CpuModel,
 		Hostname: f.Hostname,
 		Memory:   f.Memory,
 		Os:       f.Os,

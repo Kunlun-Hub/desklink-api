@@ -56,6 +56,7 @@ function averageDiskUsage(value: unknown) {
 }
 
 function MetricChart({ samples }: { samples: MetricSample[] }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const width = 720
   const height = 220
   const padding = { left: 38, right: 16, top: 18, bottom: 28 }
@@ -70,12 +71,13 @@ function MetricChart({ samples }: { samples: MetricSample[] }) {
   return (
     <div className="overflow-hidden rounded-md border border-base-200 bg-white p-3">
       <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-base-content/65">{values.map((value) => <span key={value.key} className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: value.color }} />{value.label}</span>)}</div>
-      {samples.length ? <svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full" role="img" aria-label="资源使用率趋势图">
+      {samples.length ? <div className="relative"><svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full" role="img" aria-label="资源使用率趋势图" onMouseLeave={() => setHoverIndex(null)} onMouseMove={(event) => { const rect = event.currentTarget.getBoundingClientRect(); const x = (event.clientX - rect.left) / rect.width * width; const index = samples.length <= 1 ? 0 : Math.max(0, Math.min(samples.length - 1, Math.round((x - padding.left) / plotWidth * (samples.length - 1)))); setHoverIndex(index) }}>
         {[0, 25, 50, 75, 100].map((tick) => { const y = padding.top + plotHeight - tick / 100 * plotHeight; return <g key={tick}><line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#e5e7eb" strokeWidth="1" /><text x={padding.left - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#6b7280">{tick}%</text></g> })}
-        {values.map((value) => <polyline key={value.key} points={pointString(value.points)} fill="none" stroke={value.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />)}
+        {values.map((value) => <g key={value.key}><polyline points={pointString(value.points)} fill="none" stroke={value.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />{value.points.map((point, index) => { const x = padding.left + (samples.length <= 1 ? plotWidth / 2 : index * plotWidth / (samples.length - 1)); const y = padding.top + plotHeight - Math.max(0, Math.min(100, point)) / 100 * plotHeight; return <circle key={`${value.key}-${index}`} cx={x} cy={y} r="4" fill={value.color} stroke="white" strokeWidth="2"><title>{`${formatDate(samples[index]?.timestamp)}  ${value.label}: ${point.toFixed(1)}%`}</title></circle> })}</g>)}
         <text x={padding.left} y={height - 7} fontSize="11" fill="#6b7280">{formatDate(samples[0]?.timestamp)}</text>
         <text x={width - padding.right} y={height - 7} textAnchor="end" fontSize="11" fill="#6b7280">{formatDate(samples[samples.length - 1]?.timestamp)}</text>
-      </svg> : <div className="flex h-56 items-center justify-center text-sm text-base-content/40">暂无历史指标</div>}
+        {hoverIndex !== null && <line x1={padding.left + (samples.length <= 1 ? plotWidth / 2 : hoverIndex * plotWidth / (samples.length - 1))} x2={padding.left + (samples.length <= 1 ? plotWidth / 2 : hoverIndex * plotWidth / (samples.length - 1))} y1={padding.top} y2={padding.top + plotHeight} stroke="#94a3b8" strokeDasharray="4 4" />}
+      </svg>{hoverIndex !== null && <div className="pointer-events-none absolute top-2 z-10 min-w-44 rounded-md border border-base-300 bg-white/95 p-2 text-xs shadow-lg" style={{ left: `${Math.max(12, Math.min(88, 100 * (padding.left + (samples.length <= 1 ? plotWidth / 2 : hoverIndex * plotWidth / (samples.length - 1))) / width))}%`, transform: 'translateX(-50%)' }}><div className="mb-1 font-medium text-base-content/70">{formatDate(samples[hoverIndex]?.timestamp)}</div><div className="grid grid-cols-3 gap-2">{values.map((value) => <div key={value.key}><div className="text-base-content/45">{value.label}</div><div className="font-semibold" style={{ color: value.color }}>{value.points[hoverIndex].toFixed(1)}%</div></div>)}</div></div>}</div> : <div className="flex h-56 items-center justify-center text-sm text-base-content/40">暂无历史指标</div>}
     </div>
   )
 }
@@ -94,7 +96,7 @@ function DeviceDetail({ detail, samples, range, onRangeChange }: { detail: Row; 
       <div className="rounded-md border border-base-200 bg-base-200/30 p-3"><div className="text-xs text-base-content/50">磁盘读写</div><div className="mt-1 text-sm font-semibold">{formatDetailValue('disk_read_bps', peer.disk_read_bps)} / {formatDetailValue('disk_write_bps', peer.disk_write_bps)}</div></div>
     </div>
     <div className="grid gap-3 sm:grid-cols-2">
-      {[['设备 ID', peer.id], ['主机名', peer.hostname], ['操作系统', peer.os], ['系统用户', peer.username], ['客户端版本', peer.version], ['UUID', peer.uuid]].map(([label, value]) => <div key={label} className="flex min-w-0 justify-between gap-4 rounded-md border border-base-200 p-3 text-sm"><span className="text-base-content/55">{label}</span><span className="max-w-[65%] truncate text-right" title={String(value || '')}>{String(value || '—')}</span></div>)}
+      {[['设备 ID', peer.id], ['主机名', peer.hostname], ['CPU 型号', peer.cpu_model || peer.cpu], ['操作系统', peer.os], ['系统用户', peer.username], ['客户端版本', peer.version], ['UUID', peer.uuid]].map(([label, value]) => <div key={label} className="flex min-w-0 justify-between gap-4 rounded-md border border-base-200 p-3 text-sm"><span className="text-base-content/55">{label}</span><span className="max-w-[65%] truncate text-right" title={String(value || '')}>{String(value || '—')}</span></div>)}
     </div>
     <div>
       <div className="mb-2 flex items-center justify-between"><h4 className="font-semibold">磁盘使用情况</h4><span className="text-xs text-base-content/45">容量单位：GB</span></div>
@@ -241,6 +243,26 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
       setDetailRange(range)
     } catch (error) { show(errorMessage(error), 'error') }
   }
+
+  useEffect(() => {
+    if (!detail || !config.metricsPath) return
+    const refresh = async () => {
+      const peer = (detail.peer || detail) as Row
+      const id = config.idKey === 'row_id' ? peer.row_id : peer.id
+      try {
+        const value = await get<Row>(`${config.detailPath}/${id}`)
+        setDetail(value)
+        const seconds = detailRange === '1h' ? 3600 : detailRange === '7d' ? 7 * 86400 : detailRange === '30d' ? 30 * 86400 : 86400
+        const to = Math.floor(Date.now() / 1000)
+        const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${id}`, { from: to - seconds, to })
+        setDetailSamples(metrics.samples || [])
+      } catch {
+        // Keep the last successful detail visible during transient requests.
+      }
+    }
+    const timer = window.setInterval(() => { void refresh() }, 5000)
+    return () => window.clearInterval(timer)
+  }, [config.detailPath, config.idKey, config.metricsPath, detail, detailRange])
 
   const save = async (event: FormEvent) => {
     event.preventDefault()

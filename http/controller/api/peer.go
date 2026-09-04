@@ -47,6 +47,9 @@ func (p *Peer) SysInfo(c *gin.Context) {
 		if pe.UserId == 0 {
 			pe.UserId = service.AllService.UserService.FindLatestUserIdFromLoginLogByUuid(pe.Uuid, pe.Id)
 		}
+		if fpe.CpuModel == "" {
+			fpe.CpuModel = pe.CpuModel
+		}
 		fpe.RowId = pe.RowId
 		fpe.UserId = pe.UserId
 		err = service.AllService.PeerService.Update(fpe)
@@ -103,9 +106,10 @@ func (p *Peer) AgentMetrics(c *gin.Context) {
 	if metricsAt <= 0 || metricsAt > now+300 || metricsAt < now-86400 {
 		metricsAt = now
 	}
-	updated := &model.Peer{RowId: peer.RowId, CpuUsage: clampPercent(form.CpuUsage), MemoryTotal: form.MemoryTotal, MemoryUsed: form.MemoryUsed, MemoryUsage: clampPercent(form.MemoryUsage), DiskUsage: string(disks), DiskReadBps: form.DiskReadBps, DiskWriteBps: form.DiskWriteBps, MetricsAt: metricsAt}
+	updated := &model.Peer{RowId: peer.RowId, CpuModel: form.CpuModel, CpuUsage: clampPercent(form.CpuUsage), MemoryTotal: form.MemoryTotal, MemoryUsed: form.MemoryUsed, MemoryUsage: clampPercent(form.MemoryUsage), DiskUsage: string(disks), DiskReadBps: form.DiskReadBps, DiskWriteBps: form.DiskWriteBps, MetricsAt: metricsAt}
 	if err := service.DB.Model(&model.Peer{}).Where("row_id = ?", peer.RowId).Updates(map[string]interface{}{
 		"cpu_usage":      updated.CpuUsage,
+		"cpu_model":      updated.CpuModel,
 		"memory_total":   updated.MemoryTotal,
 		"memory_used":    updated.MemoryUsed,
 		"memory_usage":   updated.MemoryUsage,
@@ -117,7 +121,7 @@ func (p *Peer) AgentMetrics(c *gin.Context) {
 		c.String(http.StatusOK, "FAILED")
 		return
 	}
-	if err := service.DB.Create(&model.AgentMetricSample{PeerId: peer.Id, Timestamp: metricsAt, CpuUsage: updated.CpuUsage, MemoryTotal: updated.MemoryTotal, MemoryUsed: updated.MemoryUsed, MemoryUsage: updated.MemoryUsage, DiskUsage: updated.DiskUsage, DiskReadBps: updated.DiskReadBps, DiskWriteBps: updated.DiskWriteBps}).Error; err != nil {
+	if err := service.DB.Create(&model.AgentMetricSample{PeerId: peer.Id, Timestamp: metricsAt, CpuModel: updated.CpuModel, CpuUsage: updated.CpuUsage, MemoryTotal: updated.MemoryTotal, MemoryUsed: updated.MemoryUsed, MemoryUsage: updated.MemoryUsage, DiskUsage: updated.DiskUsage, DiskReadBps: updated.DiskReadBps, DiskWriteBps: updated.DiskWriteBps}).Error; err != nil {
 		c.String(http.StatusOK, "FAILED")
 		return
 	}

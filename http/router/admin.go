@@ -267,6 +267,8 @@ func ConfigBind(rg *gin.RouterGroup) {
 	aR.Use(middleware.BackendUserAuth())
 	aR.GET("/server", rs.ServerConfig)
 	aR.GET("/app", rs.AppConfig)
+	aR.GET("/agent-metrics", rs.AgentMetrics)
+	aR.POST("/agent-metrics", middleware.AdminPrivilege(), rs.SaveAgentMetrics)
 
 }
 

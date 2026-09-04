@@ -113,6 +113,7 @@ func (i *Index) Heartbeat(c *gin.Context) {
 			"forced":     enabled,
 			"chunk_size": service.AllService.RecordingService.MaxChunkSize(),
 		},
+		"agent_metrics": gin.H{"interval": service.AgentMetricsInterval()},
 	})
 }
 

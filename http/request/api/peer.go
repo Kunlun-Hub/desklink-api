@@ -14,6 +14,7 @@ type AddressBookForm struct {
 
 type PeerForm struct {
 	Cpu      string `json:"cpu"`
+	CpuModel string `json:"cpu_model"`
 	Hostname string `json:"hostname"`
 	Id       string `json:"id"`
 	Memory   string `json:"memory"`
@@ -26,6 +27,7 @@ type PeerForm struct {
 func (pf *PeerForm) ToPeer() *model.Peer {
 	return &model.Peer{
 		Cpu:      pf.Cpu,
+		CpuModel: pf.CpuModel,
 		Hostname: pf.Hostname,
 		Id:       pf.Id,
 		Memory:   pf.Memory,
@@ -90,6 +92,7 @@ type AgentMetricsForm struct {
 	Uuid         string            `json:"uuid" binding:"required"`
 	Timestamp    int64             `json:"timestamp"`
 	CpuUsage     float64           `json:"cpu_usage"`
+	CpuModel     string            `json:"cpu_model"`
 	MemoryTotal  uint64            `json:"memory_total"`
 	MemoryUsed   uint64            `json:"memory_used"`
 	MemoryUsage  float64           `json:"memory_usage"`

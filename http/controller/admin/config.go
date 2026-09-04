@@ -13,6 +13,26 @@ import (
 type Config struct {
 }
 
+func (co *Config) AgentMetrics(c *gin.Context) {
+	response.Success(c, gin.H{"interval_seconds": service.AgentMetricsInterval()})
+}
+
+func (co *Config) SaveAgentMetrics(c *gin.Context) {
+	form := struct {
+		IntervalSeconds int `json:"interval_seconds" binding:"required"`
+	}{}
+	if err := c.ShouldBindJSON(&form); err != nil {
+		response.Fail(c, 101, "采集频率必须是整数")
+		return
+	}
+	interval, err := service.SetAgentMetricsInterval(form.IntervalSeconds)
+	if err != nil {
+		response.Fail(c, 101, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"interval_seconds": interval})
+}
+
 // ServerConfig RUSTDESK服务配置
 // @Tags ADMIN
 // @Summary RUSTDESK服务配置
