@@ -66,7 +66,7 @@ func TestAgentMetricsStoresHistoryAndClearsZeroRates(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.POST("/metrics", (&Peer{}).AgentMetrics)
-	req := httptest.NewRequest(http.MethodPost, "/metrics", strings.NewReader(`{"id":"history-peer","uuid":"history-uuid","cpu_usage":12.5,"memory_usage":34.5,"disk_read_bps":0,"disk_write_bps":0}`))
+	req := httptest.NewRequest(http.MethodPost, "/metrics", strings.NewReader(`{"id":"history-peer","uuid":"history-uuid","cpu_model":"Test CPU","cpu_usage":12.5,"memory_usage":34.5,"disk_read_bps":0,"disk_write_bps":0}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp := httptest.NewRecorder()
 	router.ServeHTTP(resp, req)
@@ -77,11 +77,11 @@ func TestAgentMetricsStoresHistoryAndClearsZeroRates(t *testing.T) {
 	if err = db.First(&stored, peer.RowId).Error; err != nil {
 		t.Fatal(err)
 	}
-	if stored.DiskReadBps != 0 || stored.DiskWriteBps != 0 {
+	if stored.DiskReadBps != 0 || stored.DiskWriteBps != 0 || stored.CpuModel != "Test CPU" {
 		t.Fatalf("zero rates were not persisted: %#v", stored)
 	}
 	samples, err := (&service.PeerService{}).MetricsHistory("history-peer", 0, 0, 10)
-	if err != nil || len(samples) != 1 || samples[0].CpuUsage != 12.5 {
+	if err != nil || len(samples) != 1 || samples[0].CpuUsage != 12.5 || samples[0].CpuModel != "Test CPU" {
 		t.Fatalf("unexpected stored history: %#v, %v", samples, err)
 	}
 }
