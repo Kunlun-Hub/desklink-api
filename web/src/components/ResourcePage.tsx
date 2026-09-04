@@ -55,6 +55,31 @@ function averageDiskUsage(value: unknown) {
   return entries.length ? entries.reduce((sum, entry) => sum + Number(entry.usage), 0) / entries.length : 0
 }
 
+function smoothMetricPath(points: number[], padding: { left: number; top: number }, plotWidth: number, plotHeight: number) {
+  if (!points.length) return ''
+  const coordinates = points.map((value, index) => ({
+    x: padding.left + (points.length <= 1 ? plotWidth / 2 : index * plotWidth / (points.length - 1)),
+    y: padding.top + plotHeight - Math.max(0, Math.min(100, value)) / 100 * plotHeight,
+  }))
+  if (coordinates.length === 1) return `M ${coordinates[0].x} ${coordinates[0].y}`
+  const clamp = (value: number, first: number, second: number) => Math.max(Math.min(first, second), Math.min(Math.max(first, second), value))
+  let path = `M ${coordinates[0].x} ${coordinates[0].y}`
+  for (let index = 0; index < coordinates.length - 1; index += 1) {
+    const previous = coordinates[Math.max(0, index - 1)]
+    const first = coordinates[index]
+    const second = coordinates[index + 1]
+    const next = coordinates[Math.min(coordinates.length - 1, index + 2)]
+    const tangentFirst = (second.y - previous.y) * 0.5
+    const tangentSecond = (next.y - first.y) * 0.5
+    const controlFirstY = clamp(first.y + tangentFirst / 3, first.y, second.y)
+    const controlSecondY = clamp(second.y - tangentSecond / 3, first.y, second.y)
+    const controlFirstX = first.x + (second.x - first.x) / 3
+    const controlSecondX = second.x - (second.x - first.x) / 3
+    path += ` C ${controlFirstX} ${controlFirstY}, ${controlSecondX} ${controlSecondY}, ${second.x} ${second.y}`
+  }
+  return path
+}
+
 function MetricChart({ samples }: { samples: MetricSample[] }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const width = 720
@@ -67,17 +92,16 @@ function MetricChart({ samples }: { samples: MetricSample[] }) {
     { key: 'memory_usage', label: '内存', color: '#2563eb', points: samples.map((sample) => Number(sample.memory_usage || 0)) },
     { key: 'disk_usage', label: '磁盘', color: '#16a34a', points: samples.map((sample) => averageDiskUsage(sample.disk_usage)) },
   ]
-  const pointString = (points: number[]) => points.map((value, index) => `${padding.left + (samples.length <= 1 ? plotWidth / 2 : index * plotWidth / (samples.length - 1))},${padding.top + plotHeight - Math.max(0, Math.min(100, value)) / 100 * plotHeight}`).join(' ')
   return (
     <div className="overflow-hidden rounded-md border border-base-200 bg-white p-3">
       <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-base-content/65">{values.map((value) => <span key={value.key} className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: value.color }} />{value.label}</span>)}</div>
       {samples.length ? <div className="relative"><svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full touch-none" role="img" aria-label="资源使用率趋势图" onPointerLeave={() => setHoverIndex(null)}>
         {[0, 25, 50, 75, 100].map((tick) => { const y = padding.top + plotHeight - tick / 100 * plotHeight; return <g key={tick}><line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#e5e7eb" strokeWidth="1" /><text x={padding.left - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#6b7280">{tick}%</text></g> })}
-        <rect x={padding.left} y={padding.top} width={plotWidth} height={plotHeight} fill="transparent" pointerEvents="all" onPointerMove={(event) => { const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect(); if (!rect) return; const x = (event.clientX - rect.left) / rect.width * width; const index = samples.length <= 1 ? 0 : Math.max(0, Math.min(samples.length - 1, Math.round((x - padding.left) / plotWidth * (samples.length - 1)))); setHoverIndex(index) }} />
-        {values.map((value) => <g key={value.key}><polyline points={pointString(value.points)} fill="none" stroke={value.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />{value.points.map((point, index) => { const x = padding.left + (samples.length <= 1 ? plotWidth / 2 : index * plotWidth / (samples.length - 1)); const y = padding.top + plotHeight - Math.max(0, Math.min(100, point)) / 100 * plotHeight; return <circle key={`${value.key}-${index}`} cx={x} cy={y} r="4" fill={value.color} stroke="white" strokeWidth="2"><title>{`${formatDate(samples[index]?.timestamp)}  ${value.label}: ${point.toFixed(1)}%`}</title></circle> })}</g>)}
+        <rect x={padding.left} y={padding.top} width={plotWidth} height={plotHeight} fill="transparent" pointerEvents="all" onPointerMove={(event) => { const svg = event.currentTarget.ownerSVGElement; const matrix = svg?.getScreenCTM(); if (!matrix || !svg) return; const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()); const index = samples.length <= 1 ? 0 : Math.max(0, Math.min(samples.length - 1, Math.round((point.x - padding.left) / plotWidth * (samples.length - 1)))); setHoverIndex(index) }} />
+        {values.map((value) => <path key={value.key} d={smoothMetricPath(value.points, padding, plotWidth, plotHeight)} fill="none" stroke={value.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none" />)}
         <text x={padding.left} y={height - 7} fontSize="11" fill="#6b7280">{formatDate(samples[0]?.timestamp)}</text>
         <text x={width - padding.right} y={height - 7} textAnchor="end" fontSize="11" fill="#6b7280">{formatDate(samples[samples.length - 1]?.timestamp)}</text>
-        {hoverIndex !== null && <line x1={padding.left + (samples.length <= 1 ? plotWidth / 2 : hoverIndex * plotWidth / (samples.length - 1))} x2={padding.left + (samples.length <= 1 ? plotWidth / 2 : hoverIndex * plotWidth / (samples.length - 1))} y1={padding.top} y2={padding.top + plotHeight} stroke="#94a3b8" strokeDasharray="4 4" />}
+        {hoverIndex !== null && <line x1={padding.left + (samples.length <= 1 ? plotWidth / 2 : hoverIndex * plotWidth / (samples.length - 1))} x2={padding.left + (samples.length <= 1 ? plotWidth / 2 : hoverIndex * plotWidth / (samples.length - 1))} y1={padding.top} y2={padding.top + plotHeight} stroke="#94a3b8" strokeDasharray="4 4" pointerEvents="none" />}
       </svg>{hoverIndex !== null && <div className="pointer-events-none absolute top-2 z-10 min-w-44 rounded-md border border-base-300 bg-white/95 p-2 text-xs shadow-lg" style={{ left: `${Math.max(12, Math.min(88, 100 * (padding.left + (samples.length <= 1 ? plotWidth / 2 : hoverIndex * plotWidth / (samples.length - 1))) / width))}%`, transform: 'translateX(-50%)' }}><div className="mb-1 font-medium text-base-content/70">{formatDate(samples[hoverIndex]?.timestamp)}</div><div className="grid grid-cols-3 gap-2">{values.map((value) => <div key={value.key}><div className="text-base-content/45">{value.label}</div><div className="font-semibold" style={{ color: value.color }}>{value.points[hoverIndex].toFixed(1)}%</div></div>)}</div></div>}</div> : <div className="flex h-56 items-center justify-center text-sm text-base-content/40">暂无历史指标</div>}
     </div>
   )
