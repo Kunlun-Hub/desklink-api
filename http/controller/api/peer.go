@@ -89,15 +89,21 @@ func (p *Peer) AgentMetrics(c *gin.Context) {
 		c.String(http.StatusOK, "ID_NOT_FOUND")
 		return
 	}
+	if len(form.Disks) > 64 {
+		c.String(http.StatusOK, "INVALID")
+		return
+	}
 	disks, err := json.Marshal(form.Disks)
 	if err != nil {
 		c.String(http.StatusOK, "INVALID")
 		return
 	}
-	updated := &model.Peer{RowId: peer.RowId, CpuUsage: clampPercent(form.CpuUsage), MemoryTotal: form.MemoryTotal, MemoryUsed: form.MemoryUsed, MemoryUsage: clampPercent(form.MemoryUsage), DiskUsage: string(disks), DiskReadBps: form.DiskReadBps, DiskWriteBps: form.DiskWriteBps, MetricsAt: form.Timestamp}
-	if updated.MetricsAt <= 0 {
-		updated.MetricsAt = time.Now().Unix()
+	metricsAt := form.Timestamp
+	now := time.Now().Unix()
+	if metricsAt <= 0 || metricsAt > now+300 || metricsAt < now-86400 {
+		metricsAt = now
 	}
+	updated := &model.Peer{RowId: peer.RowId, CpuUsage: clampPercent(form.CpuUsage), MemoryTotal: form.MemoryTotal, MemoryUsed: form.MemoryUsed, MemoryUsage: clampPercent(form.MemoryUsage), DiskUsage: string(disks), DiskReadBps: form.DiskReadBps, DiskWriteBps: form.DiskWriteBps, MetricsAt: metricsAt}
 	if err := service.AllService.PeerService.Update(updated); err != nil {
 		c.String(http.StatusOK, "FAILED")
 		return
