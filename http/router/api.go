@@ -30,6 +30,7 @@ func ApiInit(g *gin.Engine) {
 
 		frg.POST("/heartbeat", i.Heartbeat)
 		frg.POST("/switch-grant", i.SwitchGrant)
+		frg.POST("/internal/access-check", i.AccessCheck)
 	}
 
 	{

@@ -178,6 +178,11 @@ export const resources: Record<string, ResourceConfig> = {
     columns: [{ key: 'peer_id', label: '目标设备' }, { key: 'from_peer', label: '来源设备' }, { key: 'from_name', label: '来源名称' }, { key: 'ip', label: 'IP 地址' }, { key: 'session_id', label: '会话 ID' }, { key: 'created_at', label: '开始时间', format: 'datetime' }, { key: 'close_time', label: '结束时间', format: 'datetime' }],
     search: [{ key: 'peer_id', label: '目标设备' }, { key: 'from_peer', label: '来源设备' }],
   },
+  accessRules: {
+    key: 'access-rules', title: '授权管理', description: '按目标设备限制来源 IP、来源设备和平台用户', listPath: '/access-rules/list', createPath: '/access-rules/save', updatePath: '/access-rules/save', deletePath: '/access-rules/delete',
+    columns: [{ key: 'target_peer_id', label: '目标设备' }, { key: 'source_ip', label: '来源 IP' }, { key: 'source_peer_id', label: '来源设备' }, { key: 'source_user_id', label: '来源用户', format: 'user' }, { key: 'action', label: '动作' }, { key: 'priority', label: '优先级' }, { key: 'enabled', label: '启用', format: 'boolean' }, { key: 'remark', label: '备注' }],
+    fields: [{ key: 'target_peer_id', label: '目标设备 ID', required: true }, { key: 'source_ip', label: '来源 IP' }, { key: 'source_peer_id', label: '来源设备 ID' }, { key: 'source_user_id', label: '来源用户 ID', kind: 'number', defaultValue: 0 }, { key: 'action', label: '动作', kind: 'select', required: true, options: [{ label: '允许', value: 'allow' }, { label: '拒绝', value: 'deny' }], defaultValue: 'allow' }, { key: 'priority', label: '优先级', kind: 'number', defaultValue: 100 }, { key: 'enabled', label: '启用', kind: 'boolean', defaultValue: true }, { key: 'remark', label: '备注' }], defaults: { action: 'allow', priority: 100, enabled: true, source_user_id: 0 },
+  },
   fileAudit: {
     key: 'file-audit', title: '文件审计', description: '记录远程文件传输活动', listPath: '/audit_file/list', deletePath: '/audit_file/delete',
     columns: [{ key: 'peer_id', label: '目标设备' }, { key: 'from_peer', label: '来源设备' }, { key: 'from_name', label: '来源名称' }, { key: 'path', label: '路径' }, { key: 'info', label: '信息' }, { key: 'ip', label: 'IP 地址' }, { key: 'created_at', label: '时间', format: 'datetime' }],

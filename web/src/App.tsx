@@ -52,6 +52,7 @@ function ApplicationRoutes() {
         <Route path="admin/tags" element={<AdminRoute><ResourcePage config={resources.tags} /></AdminRoute>} />
         <Route path="admin/login-logs" element={<AdminRoute><ResourcePage config={resources.loginLogs} /></AdminRoute>} />
         <Route path="admin/connection-audit" element={<AdminRoute><ResourcePage config={resources.connectionAudit} /></AdminRoute>} />
+        <Route path="admin/access-rules" element={<AdminRoute><ResourcePage config={resources.accessRules} /></AdminRoute>} />
         <Route path="admin/file-audit" element={<AdminRoute><ResourcePage config={resources.fileAudit} /></AdminRoute>} />
         <Route path="admin/recordings" element={<AdminRoute><RecordingsPage /></AdminRoute>} />
         <Route path="admin/tokens" element={<AdminRoute><ResourcePage config={resources.tokens} /></AdminRoute>} />

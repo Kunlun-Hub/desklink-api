@@ -36,6 +36,7 @@ func Init(g *gin.Engine) {
 	LoginLogBind(adg)
 	AuditBind(adg)
 	RecordingBind(adg)
+	AccessRuleBind(adg)
 	AddressBookCollectionBind(adg)
 	AddressBookCollectionRuleBind(adg)
 	UserTokenBind(adg)
@@ -53,6 +54,14 @@ func Init(g *gin.Engine) {
 	DeviceGroupBind(adg)
 	//访问静态文件
 	//g.StaticFS("/upload", http.Dir(global.Config.Gin.ResourcesPath+"/upload"))
+}
+
+func AccessRuleBind(rg *gin.RouterGroup) {
+	r := rg.Group("/access-rules").Use(middleware.AdminPrivilege())
+	cont := &admin.AccessRule{}
+	r.GET("/list", cont.List)
+	r.POST("/save", cont.Save)
+	r.POST("/delete", cont.Delete)
 }
 
 func RecordingBind(rg *gin.RouterGroup) {

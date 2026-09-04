@@ -73,6 +73,7 @@ const groups: NavGroup[] = [
     items: [
       { label: '登录日志', path: '/admin/login-logs', icon: FileClock, admin: true },
       { label: '连接审计', path: '/admin/connection-audit', icon: Activity, admin: true },
+      { label: '授权管理', path: '/admin/access-rules', icon: ShieldCheck, admin: true },
       { label: '文件审计', path: '/admin/file-audit', icon: ShieldCheck, admin: true },
       { label: '会话录像', path: '/admin/recordings', icon: Video, admin: true },
       { label: '访问令牌', path: '/admin/tokens', icon: KeyRound, admin: true },

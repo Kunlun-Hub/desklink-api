@@ -92,6 +92,7 @@ func setupRecordingTest(t *testing.T) *RecordingService {
 	if err = db.AutoMigrate(
 		&model.Peer{}, &model.RecordingPolicy{}, &model.RecordingPolicyDevice{},
 		&model.SessionRecording{}, &model.RecordingStorageSetting{},
+		&model.AccessRule{},
 	); err != nil {
 		t.Fatal(err)
 	}
