@@ -60,6 +60,7 @@ func ApiInit(g *gin.Engine) {
 		//提交系统信息
 		frg.POST("/sysinfo", pe.SysInfo)
 		frg.POST("/sysinfo_ver", pe.SysInfoVer)
+		frg.POST("/agent/metrics", pe.AgentMetrics)
 	}
 
 	if global.Config.App.WebClient == 1 {
@@ -84,6 +85,7 @@ func ApiInit(g *gin.Engine) {
 	}
 
 	frg.Use(middleware.RustAuth())
+	frg.GET("/peer/:id/detail", (&api.Peer{}).Detail)
 	{
 		u := &api.User{}
 		frg.GET("/user/info", u.Info)

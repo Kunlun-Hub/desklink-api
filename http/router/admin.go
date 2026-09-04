@@ -317,6 +317,7 @@ func MyBind(rg *gin.RouterGroup) {
 	{
 		cont := &my.Peer{}
 		rg.GET("/my/peer/list", cont.List)
+		rg.GET("/my/peer/detail/:id", cont.Detail)
 
 	}
 

@@ -78,6 +78,26 @@ type PeerInfoInHeartbeat struct {
 	Ver  int    `json:"ver"`
 }
 
+type AgentDiskMetric struct {
+	Mount string  `json:"mount"`
+	Total uint64  `json:"total"`
+	Used  uint64  `json:"used"`
+	Usage float64 `json:"usage"`
+}
+
+type AgentMetricsForm struct {
+	Id           string            `json:"id" binding:"required"`
+	Uuid         string            `json:"uuid" binding:"required"`
+	Timestamp    int64             `json:"timestamp"`
+	CpuUsage     float64           `json:"cpu_usage"`
+	MemoryTotal  uint64            `json:"memory_total"`
+	MemoryUsed   uint64            `json:"memory_used"`
+	MemoryUsage  float64           `json:"memory_usage"`
+	Disks        []AgentDiskMetric `json:"disks"`
+	DiskReadBps  uint64            `json:"disk_read_bps"`
+	DiskWriteBps uint64            `json:"disk_write_bps"`
+}
+
 type SwitchGrantForm struct {
 	Id                 string `json:"id" validate:"required"`
 	SwitchCodeVerifier string `json:"switch_code_verifier" validate:"required"`

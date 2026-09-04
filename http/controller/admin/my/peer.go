@@ -12,6 +12,16 @@ import (
 type Peer struct {
 }
 
+func (ct *Peer) Detail(c *gin.Context) {
+	peer := service.AllService.PeerService.FindById(c.Param("id"))
+	user := service.AllService.UserService.CurUser(c)
+	if peer.RowId == 0 || peer.UserId != user.Id {
+		response.Fail(c, 404, "device not found")
+		return
+	}
+	response.Success(c, peer)
+}
+
 // List 列表
 // @Tags 我的设备
 // @Summary 设备列表

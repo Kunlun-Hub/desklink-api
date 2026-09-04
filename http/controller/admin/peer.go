@@ -30,6 +30,9 @@ func (ct *Peer) Detail(c *gin.Context) {
 	iid, _ := strconv.Atoi(id)
 	u := service.AllService.PeerService.InfoByRowId(uint(iid))
 	if u.RowId > 0 {
+		if u.DiskUsage == "" {
+			u.DiskUsage = "[]"
+		}
 		response.Success(c, u)
 		return
 	}
@@ -149,6 +152,17 @@ func (ct *Peer) Update(c *gin.Context) {
 		return
 	}
 	u := f.ToPeer()
+	existing := service.AllService.PeerService.InfoByRowId(f.RowId)
+	if existing.RowId > 0 {
+		u.CpuUsage = existing.CpuUsage
+		u.MemoryTotal = existing.MemoryTotal
+		u.MemoryUsed = existing.MemoryUsed
+		u.MemoryUsage = existing.MemoryUsage
+		u.DiskUsage = existing.DiskUsage
+		u.DiskReadBps = existing.DiskReadBps
+		u.DiskWriteBps = existing.DiskWriteBps
+		u.MetricsAt = existing.MetricsAt
+	}
 	err := service.AllService.PeerService.Update(u)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())

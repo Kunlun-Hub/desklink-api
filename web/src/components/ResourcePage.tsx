@@ -6,6 +6,19 @@ import type { ResourceColumn, ResourceConfig, ResourceField } from '../features/
 
 type Row = Record<string, any>
 
+const detailLabels: Record<string, string> = {
+  peer: '设备信息', disks: '磁盘明细', id: '设备 ID', alias: '别名', hostname: '主机名', os: '操作系统', username: '系统用户', uuid: 'UUID', version: '客户端版本', last_online_ip: '当前/最近 IP', online: '在线状态', last_online_time: '最后在线', cpu: 'CPU 摘要', cpu_usage: 'CPU 使用率', memory: '内存摘要', memory_total: '内存总量', memory_used: '内存已用', memory_usage: '内存使用率', disk_read_bps: '磁盘读取速率', disk_write_bps: '磁盘写入速率', metrics_at: '指标更新时间', mount: '挂载点', total: '总容量', used: '已用容量', usage: '使用率',
+}
+
+function formatDetailValue(key: string, value: unknown) {
+  if (key.endsWith('_usage') && typeof value === 'number') return `${value.toFixed(1)}%`
+  if (key.endsWith('_bps') && typeof value === 'number') return `${(value / 1024 / 1024).toFixed(2)} MB/s`
+  if (['memory_total', 'memory_used', 'total', 'used'].includes(key) && typeof value === 'number') return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`
+  if (key.endsWith('_at') || key === 'last_online_time') return formatDate(value)
+  if (typeof value === 'boolean') return value ? '在线' : '离线'
+  return String(value ?? '—')
+}
+
 function formatDate(value: unknown) {
   if (value === null || value === undefined || value === '' || Number(value) === 0) return '—'
   const raw = Number(value)
@@ -82,6 +95,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
   const [editing, setEditing] = useState<Row | null | undefined>(undefined)
   const [form, setForm] = useState<Row>({})
   const [users, setUsers] = useState<Record<string, string>>({})
+  const [detail, setDetail] = useState<Row | null>(null)
   const pageSize = config.pageSize || 20
 
   const load = useCallback(async () => {
@@ -114,6 +128,14 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
     setEditing(null)
   }
   const startEdit = (row: Row) => { setForm({ ...row }); setEditing(row) }
+
+  const openDetail = async (row: Row) => {
+    if (!config.detailPath) return
+    try {
+      const value = await get<Row>(`${config.detailPath}/${row[config.idKey || 'id']}`)
+      setDetail(value)
+    } catch (error) { show(errorMessage(error), 'error') }
+  }
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
@@ -187,10 +209,10 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
               ) : data.list.length === 0 ? (
                 <tr><td colSpan={config.columns.length + 1} className="h-52 text-center text-sm text-base-content/40">暂无数据</td></tr>
               ) : data.list.map((row, index) => (
-                <tr key={String(row[config.idKey || 'id'] ?? index)} className="hover:bg-base-200/40">
+                <tr key={String(row[config.idKey || 'id'] ?? index)} className={`hover:bg-base-200/40 ${config.detailPath ? 'cursor-pointer' : ''}`} onClick={() => void openDetail(row)}>
                   {config.columns.map((column) => <td key={column.key}>{column.format === 'user' ? <span>{users[String(row[column.key])] ? `${users[String(row[column.key])]} (${row[column.key]})` : row[column.key] || '—'}</span> : <Cell column={column} value={row[column.key]} />}</td>)}
                   {!config.readOnly && (config.updatePath || config.deletePath) && (
-                    <td><div className="flex justify-end gap-1">{config.updatePath && <button className="btn btn-ghost btn-xs" onClick={() => startEdit(row)} title="编辑"><Pencil size={14} /></button>}{config.deletePath && <button className="btn btn-ghost btn-xs text-error" onClick={() => void remove(row)} title="删除"><Trash2 size={14} /></button>}</div></td>
+                    <td><div className="flex justify-end gap-1">{config.detailPath && <button className="btn btn-ghost btn-xs" onClick={(event) => { event.stopPropagation(); void openDetail(row) }} title="详情">详情</button>}{config.updatePath && <button className="btn btn-ghost btn-xs" onClick={(event) => { event.stopPropagation(); startEdit(row) }} title="编辑"><Pencil size={14} /></button>}{config.deletePath && <button className="btn btn-ghost btn-xs text-error" onClick={(event) => { event.stopPropagation(); void remove(row) }} title="删除"><Trash2 size={14} /></button>}</div></td>
                   )}
                 </tr>
               ))}
@@ -226,6 +248,10 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
           </div>
           <button className="modal-backdrop" onClick={() => setEditing(undefined)} aria-label="关闭" />
         </div>
+      )}
+
+      {detail && (
+        <div className="modal modal-open"><div className="modal-box desklink-modal max-w-4xl rounded-lg p-0"><div className="flex h-14 items-center justify-between border-b border-base-300 px-5"><h3 className="font-semibold">设备详情</h3><button className="btn btn-ghost btn-sm" onClick={() => setDetail(null)}><X size={18} /></button></div><div className="max-h-[70vh] overflow-y-auto p-5">{Object.entries(detail).map(([key, value]) => <div key={key} className="mb-4 last:mb-0"><div className="mb-2 text-sm font-semibold text-base-content/70">{detailLabels[key] || key}</div>{Array.isArray(value) ? <div className="grid gap-3 sm:grid-cols-2">{value.map((item, index) => <div key={index} className="rounded-md border border-base-200 p-3">{Object.entries(item || {}).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 border-b border-base-200 py-1.5 last:border-0"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div>)}</div> : typeof value === 'object' && value !== null ? <div className="grid gap-3 sm:grid-cols-2">{Object.entries(value).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 rounded-md border border-base-200 p-3"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div> : <div className="rounded-md border border-base-200 p-3 text-sm">{formatDetailValue(key, value)}</div>}</div>)}</div></div><button className="modal-backdrop" onClick={() => setDetail(null)} aria-label="关闭" /></div>
       )}
     </section>
   )
