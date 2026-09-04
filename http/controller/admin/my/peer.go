@@ -1,11 +1,14 @@
 package my
 
 import (
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/lejianwen/rustdesk-api/v2/http/request/admin"
+	requestapi "github.com/lejianwen/rustdesk-api/v2/http/request/api"
 	"github.com/lejianwen/rustdesk-api/v2/http/response"
 	"github.com/lejianwen/rustdesk-api/v2/service"
 	"gorm.io/gorm"
+	"strconv"
 	"time"
 )
 
@@ -19,7 +22,29 @@ func (ct *Peer) Detail(c *gin.Context) {
 		response.Fail(c, 404, "device not found")
 		return
 	}
-	response.Success(c, peer)
+	peer.Online = service.AllService.PeerService.IsOnline(peer.LastOnlineTime)
+	var disks []requestapi.AgentDiskMetric
+	if peer.DiskUsage != "" {
+		_ = json.Unmarshal([]byte(peer.DiskUsage), &disks)
+	}
+	response.Success(c, gin.H{"peer": peer, "disks": disks})
+}
+
+func (ct *Peer) Metrics(c *gin.Context) {
+	peer := service.AllService.PeerService.FindById(c.Param("id"))
+	user := service.AllService.UserService.CurUser(c)
+	if peer.RowId == 0 || peer.UserId != user.Id {
+		response.Fail(c, 404, "device not found")
+		return
+	}
+	from, _ := strconv.ParseInt(c.Query("from"), 10, 64)
+	to, _ := strconv.ParseInt(c.Query("to"), 10, 64)
+	samples, err := service.AllService.PeerService.MetricsHistory(peer.Id, from, to, 2000)
+	if err != nil {
+		response.Fail(c, 101, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"peer_id": peer.Id, "samples": samples, "from": from, "to": to})
 }
 
 // List 列表

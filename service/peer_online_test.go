@@ -76,3 +76,25 @@ func TestOnlineStateIsSharedByPeerAndAddressBookLists(t *testing.T) {
 		t.Fatalf("unexpected address book states: %#v", addressBookStates)
 	}
 }
+
+func TestMetricsHistoryIsBoundedAndChronological(t *testing.T) {
+	setupRecordingTest(t)
+	if err := DB.AutoMigrate(&model.AgentMetricSample{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := DB.Create([]*model.AgentMetricSample{
+		{PeerId: "history-peer", Timestamp: 30, CpuUsage: 30},
+		{PeerId: "history-peer", Timestamp: 10, CpuUsage: 10},
+		{PeerId: "history-peer", Timestamp: 20, CpuUsage: 20},
+		{PeerId: "other-peer", Timestamp: 15, CpuUsage: 99},
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	samples, err := AllService.PeerService.MetricsHistory("history-peer", 15, 30, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(samples) != 2 || samples[0].Timestamp != 20 || samples[1].Timestamp != 30 {
+		t.Fatalf("unexpected metric history: %#v", samples)
+	}
+}

@@ -26,6 +26,87 @@ function formatDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-CN', { hour12: false })
 }
 
+type MetricSample = {
+  timestamp?: number
+  cpu_usage?: number
+  memory_usage?: number
+  disk_usage?: string | Array<{ usage?: number }>
+}
+
+function formatBytes(value: unknown) {
+  const bytes = Number(value)
+  if (!Number.isFinite(bytes)) return '—'
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`
+}
+
+function diskEntries(value: unknown): Array<{ mount?: string; total?: number; used?: number; usage?: number }> {
+  if (Array.isArray(value)) return value as Array<{ mount?: string; total?: number; used?: number; usage?: number }>
+  if (typeof value !== 'string' || !value) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function averageDiskUsage(value: unknown) {
+  const entries = diskEntries(value).filter((entry) => typeof entry.usage === 'number')
+  return entries.length ? entries.reduce((sum, entry) => sum + Number(entry.usage), 0) / entries.length : 0
+}
+
+function MetricChart({ samples }: { samples: MetricSample[] }) {
+  const width = 720
+  const height = 220
+  const padding = { left: 38, right: 16, top: 18, bottom: 28 }
+  const plotWidth = width - padding.left - padding.right
+  const plotHeight = height - padding.top - padding.bottom
+  const values = [
+    { key: 'cpu_usage', label: 'CPU', color: '#f59e0b', points: samples.map((sample) => Number(sample.cpu_usage || 0)) },
+    { key: 'memory_usage', label: '内存', color: '#2563eb', points: samples.map((sample) => Number(sample.memory_usage || 0)) },
+    { key: 'disk_usage', label: '磁盘', color: '#16a34a', points: samples.map((sample) => averageDiskUsage(sample.disk_usage)) },
+  ]
+  const pointString = (points: number[]) => points.map((value, index) => `${padding.left + (samples.length <= 1 ? plotWidth / 2 : index * plotWidth / (samples.length - 1))},${padding.top + plotHeight - Math.max(0, Math.min(100, value)) / 100 * plotHeight}`).join(' ')
+  return (
+    <div className="overflow-hidden rounded-md border border-base-200 bg-white p-3">
+      <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-base-content/65">{values.map((value) => <span key={value.key} className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: value.color }} />{value.label}</span>)}</div>
+      {samples.length ? <svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full" role="img" aria-label="资源使用率趋势图">
+        {[0, 25, 50, 75, 100].map((tick) => { const y = padding.top + plotHeight - tick / 100 * plotHeight; return <g key={tick}><line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#e5e7eb" strokeWidth="1" /><text x={padding.left - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#6b7280">{tick}%</text></g> })}
+        {values.map((value) => <polyline key={value.key} points={pointString(value.points)} fill="none" stroke={value.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />)}
+        <text x={padding.left} y={height - 7} fontSize="11" fill="#6b7280">{formatDate(samples[0]?.timestamp)}</text>
+        <text x={width - padding.right} y={height - 7} textAnchor="end" fontSize="11" fill="#6b7280">{formatDate(samples[samples.length - 1]?.timestamp)}</text>
+      </svg> : <div className="flex h-56 items-center justify-center text-sm text-base-content/40">暂无历史指标</div>}
+    </div>
+  )
+}
+
+function DeviceDetail({ detail, samples, range, onRangeChange }: { detail: Row; samples: MetricSample[]; range: string; onRangeChange: (range: string) => void }) {
+  const peer = (detail.peer || {}) as Row
+  const disks = diskEntries(detail.disks || peer.disk_usage)
+  const ranges = [{ value: '1h', label: '1 小时' }, { value: '24h', label: '24 小时' }, { value: '7d', label: '7 天' }, { value: '30d', label: '30 天' }]
+  return <div className="space-y-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="rounded-md border border-base-200 bg-base-200/30 p-3"><div className="text-xs text-base-content/50">在线状态</div><div className={`mt-1 text-lg font-semibold ${peer.online ? 'text-emerald-600' : 'text-base-content/55'}`}>{peer.online ? '在线' : '离线'}</div><div className="mt-1 text-xs text-base-content/45">最后心跳 {formatDate(peer.last_online_time)}</div></div>
+      <div className="rounded-md border border-base-200 bg-base-200/30 p-3"><div className="text-xs text-base-content/50">当前/最近 IP</div><div className="mt-1 font-mono text-sm">{peer.last_online_ip || '—'}</div></div>
+      <div className="rounded-md border border-base-200 bg-base-200/30 p-3"><div className="text-xs text-base-content/50">CPU 使用率</div><div className="mt-1 text-lg font-semibold">{formatDetailValue('cpu_usage', peer.cpu_usage)}</div></div>
+      <div className="rounded-md border border-base-200 bg-base-200/30 p-3"><div className="text-xs text-base-content/50">内存使用率</div><div className="mt-1 text-lg font-semibold">{formatDetailValue('memory_usage', peer.memory_usage)}</div></div>
+      <div className="rounded-md border border-base-200 bg-base-200/30 p-3"><div className="text-xs text-base-content/50">内存容量</div><div className="mt-1 text-sm font-semibold">{formatBytes(peer.memory_used)} / {formatBytes(peer.memory_total)}</div></div>
+      <div className="rounded-md border border-base-200 bg-base-200/30 p-3"><div className="text-xs text-base-content/50">磁盘读写</div><div className="mt-1 text-sm font-semibold">{formatDetailValue('disk_read_bps', peer.disk_read_bps)} / {formatDetailValue('disk_write_bps', peer.disk_write_bps)}</div></div>
+    </div>
+    <div className="grid gap-3 sm:grid-cols-2">
+      {[['设备 ID', peer.id], ['主机名', peer.hostname], ['操作系统', peer.os], ['系统用户', peer.username], ['客户端版本', peer.version], ['UUID', peer.uuid]].map(([label, value]) => <div key={label} className="flex min-w-0 justify-between gap-4 rounded-md border border-base-200 p-3 text-sm"><span className="text-base-content/55">{label}</span><span className="max-w-[65%] truncate text-right" title={String(value || '')}>{String(value || '—')}</span></div>)}
+    </div>
+    <div>
+      <div className="mb-2 flex items-center justify-between"><h4 className="font-semibold">磁盘使用情况</h4><span className="text-xs text-base-content/45">容量单位：GB</span></div>
+      <div className="grid gap-3 md:grid-cols-2">{disks.length ? disks.map((disk, index) => <div key={`${disk.mount || 'disk'}-${index}`} className="rounded-md border border-base-200 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-medium">{disk.mount || '未命名磁盘'}</span><span className="text-sm font-semibold">{Number(disk.usage || 0).toFixed(1)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-base-200"><div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(0, Math.min(100, Number(disk.usage || 0)))}%` }} /></div><div className="mt-2 text-xs text-base-content/55">{formatBytes(disk.used)} / {formatBytes(disk.total)} 已用</div></div>) : <div className="rounded-md border border-base-200 p-4 text-sm text-base-content/40">暂无磁盘数据</div>}</div>
+    </div>
+    <div>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold">资源使用趋势</h4><div className="join">{ranges.map((item) => <button key={item.value} className={`btn btn-xs join-item ${range === item.value ? 'btn-neutral' : 'btn-ghost border border-base-300'}`} onClick={() => onRangeChange(item.value)}>{item.label}</button>)}</div></div>
+      <MetricChart samples={samples} />
+    </div>
+  </div>
+}
+
 function Cell({ column, value }: { column: ResourceColumn; value: unknown }) {
   if (column.format === 'status') {
     const enabled = Number(value) === 1
@@ -96,6 +177,8 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
   const [form, setForm] = useState<Row>({})
   const [users, setUsers] = useState<Record<string, string>>({})
   const [detail, setDetail] = useState<Row | null>(null)
+  const [detailSamples, setDetailSamples] = useState<MetricSample[]>([])
+  const [detailRange, setDetailRange] = useState('24h')
   const pageSize = config.pageSize || 20
 
   const load = useCallback(async () => {
@@ -134,6 +217,28 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
     try {
       const value = await get<Row>(`${config.detailPath}/${row[config.idKey || 'id']}`)
       setDetail(value)
+      setDetailRange('24h')
+      if (config.metricsPath) {
+        const to = Math.floor(Date.now() / 1000)
+        const from = to - 24 * 60 * 60
+        const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${row[config.idKey || 'id']}`, { from, to })
+        setDetailSamples(metrics.samples || [])
+      } else {
+        setDetailSamples([])
+      }
+    } catch (error) { show(errorMessage(error), 'error') }
+  }
+
+  const loadDetailRange = async (range: string) => {
+    if (!detail || !config.metricsPath) return
+    const peer = (detail.peer || detail) as Row
+    const id = config.idKey === 'row_id' ? peer.row_id : peer.id
+    const seconds = range === '1h' ? 3600 : range === '7d' ? 7 * 86400 : range === '30d' ? 30 * 86400 : 86400
+    const to = Math.floor(Date.now() / 1000)
+    try {
+      const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${id}`, { from: to - seconds, to })
+      setDetailSamples(metrics.samples || [])
+      setDetailRange(range)
     } catch (error) { show(errorMessage(error), 'error') }
   }
 
@@ -251,7 +356,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
       )}
 
       {detail && (
-        <div className="modal modal-open"><div className="modal-box desklink-modal max-w-4xl rounded-lg p-0"><div className="flex h-14 items-center justify-between border-b border-base-300 px-5"><h3 className="font-semibold">设备详情</h3><button className="btn btn-ghost btn-sm" onClick={() => setDetail(null)}><X size={18} /></button></div><div className="max-h-[70vh] overflow-y-auto p-5">{Object.entries(detail).map(([key, value]) => <div key={key} className="mb-4 last:mb-0"><div className="mb-2 text-sm font-semibold text-base-content/70">{detailLabels[key] || key}</div>{Array.isArray(value) ? <div className="grid gap-3 sm:grid-cols-2">{value.map((item, index) => <div key={index} className="rounded-md border border-base-200 p-3">{Object.entries(item || {}).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 border-b border-base-200 py-1.5 last:border-0"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div>)}</div> : typeof value === 'object' && value !== null ? <div className="grid gap-3 sm:grid-cols-2">{Object.entries(value).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 rounded-md border border-base-200 p-3"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div> : <div className="rounded-md border border-base-200 p-3 text-sm">{formatDetailValue(key, value)}</div>}</div>)}</div></div><button className="modal-backdrop" onClick={() => setDetail(null)} aria-label="关闭" /></div>
+        <div className="modal modal-open"><div className="modal-box desklink-modal max-w-5xl rounded-lg p-0"><div className="flex h-14 items-center justify-between border-b border-base-300 px-5"><h3 className="font-semibold">设备详情</h3><button className="btn btn-ghost btn-sm" onClick={() => setDetail(null)}><X size={18} /></button></div><div className="max-h-[78vh] overflow-y-auto p-5">{config.metricsPath ? <DeviceDetail detail={detail} samples={detailSamples} range={detailRange} onRangeChange={(range) => void loadDetailRange(range)} /> : Object.entries(detail).map(([key, value]) => <div key={key} className="mb-4 last:mb-0"><div className="mb-2 text-sm font-semibold text-base-content/70">{detailLabels[key] || key}</div>{Array.isArray(value) ? <div className="grid gap-3 sm:grid-cols-2">{value.map((item, index) => <div key={index} className="rounded-md border border-base-200 p-3">{Object.entries(item || {}).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 border-b border-base-200 py-1.5 last:border-0"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div>)}</div> : typeof value === 'object' && value !== null ? <div className="grid gap-3 sm:grid-cols-2">{Object.entries(value).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 rounded-md border border-base-200 p-3"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div> : <div className="rounded-md border border-base-200 p-3 text-sm">{formatDetailValue(key, value)}</div>}</div>)}</div></div><button className="modal-backdrop" onClick={() => setDetail(null)} aria-label="关闭" /></div>
       )}
     </section>
   )

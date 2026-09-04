@@ -180,6 +180,7 @@ func PeerBind(rg *gin.RouterGroup) {
 		cont := &admin.Peer{}
 		aR.GET("/list", cont.List)
 		aR.GET("/detail/:id", cont.Detail)
+		aR.GET("/metrics/:id", cont.Metrics)
 		aR.POST("/create", cont.Create)
 		aR.POST("/update", cont.Update)
 		aR.POST("/delete", cont.Delete)
@@ -327,6 +328,7 @@ func MyBind(rg *gin.RouterGroup) {
 		cont := &my.Peer{}
 		rg.GET("/my/peer/list", cont.List)
 		rg.GET("/my/peer/detail/:id", cont.Detail)
+		rg.GET("/my/peer/metrics/:id", cont.Metrics)
 
 	}
 

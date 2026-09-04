@@ -104,7 +104,20 @@ func (p *Peer) AgentMetrics(c *gin.Context) {
 		metricsAt = now
 	}
 	updated := &model.Peer{RowId: peer.RowId, CpuUsage: clampPercent(form.CpuUsage), MemoryTotal: form.MemoryTotal, MemoryUsed: form.MemoryUsed, MemoryUsage: clampPercent(form.MemoryUsage), DiskUsage: string(disks), DiskReadBps: form.DiskReadBps, DiskWriteBps: form.DiskWriteBps, MetricsAt: metricsAt}
-	if err := service.AllService.PeerService.Update(updated); err != nil {
+	if err := service.DB.Model(&model.Peer{}).Where("row_id = ?", peer.RowId).Updates(map[string]interface{}{
+		"cpu_usage":      updated.CpuUsage,
+		"memory_total":   updated.MemoryTotal,
+		"memory_used":    updated.MemoryUsed,
+		"memory_usage":   updated.MemoryUsage,
+		"disk_usage":     updated.DiskUsage,
+		"disk_read_bps":  updated.DiskReadBps,
+		"disk_write_bps": updated.DiskWriteBps,
+		"metrics_at":     updated.MetricsAt,
+	}).Error; err != nil {
+		c.String(http.StatusOK, "FAILED")
+		return
+	}
+	if err := service.DB.Create(&model.AgentMetricSample{PeerId: peer.Id, Timestamp: metricsAt, CpuUsage: updated.CpuUsage, MemoryTotal: updated.MemoryTotal, MemoryUsed: updated.MemoryUsed, MemoryUsage: updated.MemoryUsage, DiskUsage: updated.DiskUsage, DiskReadBps: updated.DiskReadBps, DiskWriteBps: updated.DiskWriteBps}).Error; err != nil {
 		c.String(http.StatusOK, "FAILED")
 		return
 	}
@@ -118,6 +131,7 @@ func (p *Peer) Detail(c *gin.Context) {
 		response.Fail(c, 404, "device not found")
 		return
 	}
+	peer.Online = service.AllService.PeerService.IsOnline(peer.LastOnlineTime)
 	var disks []requstform.AgentDiskMetric
 	if peer.DiskUsage != "" {
 		_ = json.Unmarshal([]byte(peer.DiskUsage), &disks)

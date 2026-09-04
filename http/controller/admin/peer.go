@@ -1,9 +1,11 @@
 package admin
 
 import (
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/lejianwen/rustdesk-api/v2/global"
 	"github.com/lejianwen/rustdesk-api/v2/http/request/admin"
+	requestapi "github.com/lejianwen/rustdesk-api/v2/http/request/api"
 	"github.com/lejianwen/rustdesk-api/v2/http/response"
 	"github.com/lejianwen/rustdesk-api/v2/service"
 	"gorm.io/gorm"
@@ -30,14 +32,37 @@ func (ct *Peer) Detail(c *gin.Context) {
 	iid, _ := strconv.Atoi(id)
 	u := service.AllService.PeerService.InfoByRowId(uint(iid))
 	if u.RowId > 0 {
-		if u.DiskUsage == "" {
-			u.DiskUsage = "[]"
+		u.Online = service.AllService.PeerService.IsOnline(u.LastOnlineTime)
+		var disks []requestapi.AgentDiskMetric
+		if u.DiskUsage != "" {
+			_ = json.Unmarshal([]byte(u.DiskUsage), &disks)
 		}
-		response.Success(c, u)
+		response.Success(c, gin.H{"peer": u, "disks": disks})
 		return
 	}
 	response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
 	return
+}
+
+func (ct *Peer) Metrics(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.Fail(c, 101, "invalid device id")
+		return
+	}
+	peer := service.AllService.PeerService.InfoByRowId(uint(id))
+	if peer.RowId == 0 {
+		response.Fail(c, 404, response.TranslateMsg(c, "ItemNotFound"))
+		return
+	}
+	from, _ := strconv.ParseInt(c.Query("from"), 10, 64)
+	to, _ := strconv.ParseInt(c.Query("to"), 10, 64)
+	samples, err := service.AllService.PeerService.MetricsHistory(peer.Id, from, to, 2000)
+	if err != nil {
+		response.Fail(c, 101, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"peer_id": peer.Id, "samples": samples, "from": from, "to": to})
 }
 
 // Create 创建设备

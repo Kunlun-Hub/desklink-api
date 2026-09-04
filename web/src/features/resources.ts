@@ -26,6 +26,7 @@ export interface ResourceConfig {
   description: string
   listPath: string
   detailPath?: string
+  metricsPath?: string
   createPath?: string
   updatePath?: string
   deletePath?: string
@@ -59,7 +60,7 @@ export const resources: Record<string, ResourceConfig> = {
     ], search: [{ key: 'username', label: '用户名', placeholder: '搜索用户名' }], defaults: { group_id: 1, status: 1, is_admin: false },
   },
   devices: {
-    key: 'devices', title: '设备管理', description: '查看客户端上报的设备状态和版本信息', listPath: '/peer/list', detailPath: '/peer/detail', createPath: '/peer/create', updatePath: '/peer/update', deletePath: '/peer/delete', idKey: 'row_id', deleteBodyKey: 'row_id',
+    key: 'devices', title: '设备管理', description: '查看客户端上报的设备状态和版本信息', listPath: '/peer/list', detailPath: '/peer/detail', metricsPath: '/peer/metrics', createPath: '/peer/create', updatePath: '/peer/update', deletePath: '/peer/delete', idKey: 'row_id', deleteBodyKey: 'row_id',
     columns: [
       { key: 'id', label: '设备 ID' }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' }, { key: 'os', label: '平台', format: 'platform' },
       { key: 'username', label: '系统用户' }, { key: 'last_online_ip', label: '当前/最近 IP' }, { key: 'version', label: '客户端版本' }, { key: 'online', label: '在线状态', format: 'online' }, { key: 'last_online_time', label: '最后在线', format: 'datetime' },
@@ -132,7 +133,7 @@ export const resources: Record<string, ResourceConfig> = {
     ], defaults: { oauth_type: 'oidc', scopes: '', auto_register: false, pkce_enable: false, pkce_method: 'S256' },
   },
   myDevices: {
-    key: 'my-devices', title: '我的设备', description: '当前账号绑定和最近上报的设备', listPath: '/my/peer/list', detailPath: '/my/peer/detail', readOnly: true,
+    key: 'my-devices', title: '我的设备', description: '当前账号绑定和最近上报的设备', listPath: '/my/peer/list', detailPath: '/my/peer/detail', metricsPath: '/my/peer/metrics', readOnly: true,
     columns: [{ key: 'id', label: '设备 ID' }, { key: 'alias', label: '别名' }, { key: 'hostname', label: '主机名' }, { key: 'os', label: '平台', format: 'platform' }, { key: 'last_online_ip', label: '当前/最近 IP' }, { key: 'version', label: '版本' }, { key: 'online', label: '在线状态', format: 'online' }, { key: 'last_online_time', label: '最后在线', format: 'datetime' }],
   },
   myAddressBooks: {

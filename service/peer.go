@@ -15,6 +15,40 @@ func peerIsOnline(lastOnlineTime, now int64) bool {
 	return lastOnlineTime > 0 && now-lastOnlineTime <= int64(peerOnlineTimeout/time.Second)
 }
 
+func (ps *PeerService) IsOnline(lastOnlineTime int64) bool {
+	return peerIsOnline(lastOnlineTime, time.Now().Unix())
+}
+
+func (ps *PeerService) MetricsHistory(peerID string, from, to int64, limit int) ([]*model.AgentMetricSample, error) {
+	if limit <= 0 || limit > 2000 {
+		limit = 1000
+	}
+	tx := DB.Where("peer_id = ?", peerID)
+	if from > 0 {
+		tx = tx.Where("timestamp >= ?", from)
+	}
+	if to > 0 {
+		tx = tx.Where("timestamp <= ?", to)
+	}
+	var samples []*model.AgentMetricSample
+	if err := tx.Order("timestamp asc").Limit(100000).Find(&samples).Error; err != nil {
+		return nil, err
+	}
+	if len(samples) > limit {
+		selected := make([]*model.AgentMetricSample, 0, limit)
+		if limit == 1 {
+			selected = append(selected, samples[len(samples)-1])
+		} else {
+			for index := 0; index < limit; index++ {
+				position := index * (len(samples) - 1) / (limit - 1)
+				selected = append(selected, samples[position])
+			}
+		}
+		samples = selected
+	}
+	return samples, nil
+}
+
 func ApplyPeerOnlineFilter(tx *gorm.DB, online string) {
 	cutoff := time.Now().Unix() - int64(peerOnlineTimeout/time.Second)
 	switch online {
