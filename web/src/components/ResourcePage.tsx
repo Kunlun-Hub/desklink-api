@@ -244,17 +244,17 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
     } catch (error) { show(errorMessage(error), 'error') }
   }
 
+  const detailId = detail ? ((detail.peer || detail)[config.idKey === 'row_id' ? 'row_id' : 'id'] as string | number | undefined) : undefined
+
   useEffect(() => {
-    if (!detail || !config.metricsPath) return
+    if (!detailId || !config.metricsPath || !config.detailPath) return
     const refresh = async () => {
-      const peer = (detail.peer || detail) as Row
-      const id = config.idKey === 'row_id' ? peer.row_id : peer.id
       try {
-        const value = await get<Row>(`${config.detailPath}/${id}`)
+        const value = await get<Row>(`${config.detailPath}/${detailId}`)
         setDetail(value)
         const seconds = detailRange === '1h' ? 3600 : detailRange === '7d' ? 7 * 86400 : detailRange === '30d' ? 30 * 86400 : 86400
         const to = Math.floor(Date.now() / 1000)
-        const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${id}`, { from: to - seconds, to })
+        const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${detailId}`, { from: to - seconds, to })
         setDetailSamples(metrics.samples || [])
       } catch {
         // Keep the last successful detail visible during transient requests.
@@ -262,7 +262,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
     }
     const timer = window.setInterval(() => { void refresh() }, 5000)
     return () => window.clearInterval(timer)
-  }, [config.detailPath, config.idKey, config.metricsPath, detail, detailRange])
+  }, [config.detailPath, config.metricsPath, detailId, detailRange])
 
   const save = async (event: FormEvent) => {
     event.preventDefault()

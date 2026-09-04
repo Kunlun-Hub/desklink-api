@@ -10,6 +10,7 @@ import (
 	"github.com/lejianwen/rustdesk-api/v2/model"
 	"github.com/lejianwen/rustdesk-api/v2/service"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -106,7 +107,11 @@ func (p *Peer) AgentMetrics(c *gin.Context) {
 	if metricsAt <= 0 || metricsAt > now+300 || metricsAt < now-86400 {
 		metricsAt = now
 	}
-	updated := &model.Peer{RowId: peer.RowId, CpuModel: form.CpuModel, CpuUsage: clampPercent(form.CpuUsage), MemoryTotal: form.MemoryTotal, MemoryUsed: form.MemoryUsed, MemoryUsage: clampPercent(form.MemoryUsage), DiskUsage: string(disks), DiskReadBps: form.DiskReadBps, DiskWriteBps: form.DiskWriteBps, MetricsAt: metricsAt}
+	cpuModel := strings.TrimSpace(form.CpuModel)
+	if cpuModel == "" {
+		cpuModel = peer.CpuModel
+	}
+	updated := &model.Peer{RowId: peer.RowId, CpuModel: cpuModel, CpuUsage: clampPercent(form.CpuUsage), MemoryTotal: form.MemoryTotal, MemoryUsed: form.MemoryUsed, MemoryUsage: clampPercent(form.MemoryUsage), DiskUsage: string(disks), DiskReadBps: form.DiskReadBps, DiskWriteBps: form.DiskWriteBps, MetricsAt: metricsAt}
 	if err := service.DB.Model(&model.Peer{}).Where("row_id = ?", peer.RowId).Updates(map[string]interface{}{
 		"cpu_usage":      updated.CpuUsage,
 		"cpu_model":      updated.CpuModel,
