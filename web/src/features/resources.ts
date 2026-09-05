@@ -1,4 +1,4 @@
-export type FieldKind = 'text' | 'number' | 'boolean' | 'select' | 'password' | 'tags'
+export type FieldKind = 'text' | 'number' | 'boolean' | 'select' | 'password' | 'tags' | 'role'
 
 export interface ResourceField {
   key: string
@@ -17,7 +17,7 @@ export interface ResourceField {
 export interface ResourceColumn {
   key: string
   label: string
-  format?: 'status' | 'boolean' | 'online' | 'datetime' | 'tags' | 'platform' | 'secret' | 'user'
+  format?: 'status' | 'boolean' | 'online' | 'datetime' | 'tags' | 'platform' | 'secret' | 'user' | 'role'
 }
 
 export interface ResourceConfig {
@@ -51,14 +51,14 @@ export const resources: Record<string, ResourceConfig> = {
     key: 'users', title: '用户管理', description: '管理社区账号、角色与账号状态', listPath: '/user/list', createPath: '/user/create', updatePath: '/user/update', deletePath: '/user/delete',
     columns: [
       { key: 'username', label: '用户名' }, { key: 'nickname', label: '显示名称' }, { key: 'email', label: '邮箱' },
-      { key: 'group_id', label: '用户组' }, { key: 'is_admin', label: '管理员', format: 'boolean' }, { key: 'status', label: '状态', format: 'status' }, { key: 'created_at', label: '创建时间', format: 'datetime' },
+      { key: 'group_id', label: '用户组' }, { key: 'role', label: '角色', format: 'role' }, { key: 'status', label: '状态', format: 'status' }, { key: 'created_at', label: '创建时间', format: 'datetime' },
     ],
     fields: [
       { key: 'username', label: '用户名', required: true }, { key: 'password', label: '登录密码', kind: 'password', requiredOnCreate: true, createOnly: true }, { key: 'nickname', label: '显示名称' }, { key: 'email', label: '邮箱' },
       { key: 'group_id', label: '用户组 ID', kind: 'number', required: true, defaultValue: 1 },
-      { key: 'is_admin', label: '管理员权限', kind: 'boolean', defaultValue: false },
+      { key: 'role_id', label: '控制台角色', kind: 'role', placeholder: '选择角色（可选）' },
       { key: 'status', label: '账号状态', kind: 'select', options: enabledOptions, defaultValue: 1 }, { key: 'remark', label: '备注' },
-    ], search: [{ key: 'username', label: '用户名', placeholder: '搜索用户名' }], defaults: { group_id: 1, status: 1, is_admin: false },
+    ], search: [{ key: 'username', label: '用户名', placeholder: '搜索用户名' }], defaults: { group_id: 1, status: 1, role_id: 0 },
   },
   devices: {
     key: 'devices', title: '设备管理', description: '查看客户端上报的设备状态和版本信息', listPath: '/peer/list', detailPath: '/peer/detail', metricsPath: '/peer/metrics', credentialsPath: '/peer/credentials', createPath: '/peer/create', updatePath: '/peer/update', deletePath: '/peer/delete', idKey: 'row_id', deleteBodyKey: 'row_id',

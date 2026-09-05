@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Cloud, Download, Film, HardDrive, MousePointer2, Play, RefreshCw, Save, Search, Trash2, X } from 'lucide-react'
 import { errorMessage, get, normalizePage, post, type PageData } from '../lib/api'
 import { useToast } from '../components/Toast'
+import { useAuth } from '../lib/auth'
 
 type PolicyMode = 'off' | 'all' | 'selected'
 
@@ -90,6 +91,8 @@ function formatTime(timestamp: number) {
 
 export default function RecordingsPage() {
   const { show } = useToast()
+  const { user } = useAuth()
+  const readOnly = user?.role_code === 'auditor'
   const [policy, setPolicy] = useState<RecordingPolicy>({ mode: 'off', retention_days: 30, peer_ids: [] })
   const [peers, setPeers] = useState<Peer[]>([])
   const [records, setRecords] = useState<PageData<Recording>>(normalizePage())
@@ -136,10 +139,10 @@ export default function RecordingsPage() {
   }, [page, peerFilter, fromFilter, statusFilter, startedAfter, startedBefore])
 
   useEffect(() => {
-    Promise.all([loadPolicy(), loadStorage(), loadPeers(), loadRecords()])
+    Promise.all([loadPolicy(), loadStorage(), ...(readOnly ? [] : [loadPeers()]), loadRecords()])
       .catch((error) => show(errorMessage(error), 'error'))
       .finally(() => setLoading(false))
-  }, [loadPolicy, loadStorage, loadPeers, loadRecords, show])
+  }, [loadPolicy, loadStorage, loadPeers, loadRecords, readOnly, show])
 
   const visiblePeers = useMemo(() => {
     const term = deviceSearch.trim().toLowerCase()
@@ -230,12 +233,12 @@ export default function RecordingsPage() {
     <section className="space-y-5">
       <div className="flex items-end justify-between gap-4">
         <div><h1 className="text-xl font-semibold">会话录像</h1><p className="mt-1 text-sm text-base-content/50">管理被控设备的强制录制策略和审计录像。</p></div>
-        <button className="btn btn-sm border-0 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => void savePolicy()} disabled={saving}>
+        {!readOnly && <button className="btn btn-sm border-0 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => void savePolicy()} disabled={saving}>
           {saving ? <span className="loading loading-spinner loading-xs" /> : <Save size={15} />}保存策略
-        </button>
+        </button>}
       </div>
 
-      <div className="desklink-card p-5">
+      {!readOnly && <div className="desklink-card p-5">
         <div className="grid gap-3 lg:grid-cols-3">
           {modeOptions.map((option) => (
             <button key={option.value} className={`min-h-20 rounded-md border p-4 text-left transition ${policy.mode === option.value ? 'border-emerald-500 bg-emerald-50' : 'border-base-300 hover:border-base-content/25'}`} onClick={() => setPolicy((value) => ({ ...value, mode: option.value }))}>
@@ -245,9 +248,9 @@ export default function RecordingsPage() {
           ))}
         </div>
         <label className="mt-4 flex max-w-xs items-center gap-3 text-sm"><span className="whitespace-nowrap text-base-content/60">保留天数</span><input type="number" min={1} max={3650} className="input input-bordered input-sm w-28" value={policy.retention_days} onChange={(event) => setPolicy((value) => ({ ...value, retention_days: Number(event.target.value) }))} /></label>
-      </div>
+      </div>}
 
-      <div className="desklink-card overflow-hidden">
+      {!readOnly && <div className="desklink-card overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-base-300 px-5 py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-md bg-sky-50 text-sky-600">{storage.backend === 'local' ? <HardDrive size={18} /> : <Cloud size={18} />}</div>
           <div className="mr-auto"><div className="text-sm font-semibold">录像存储</div><div className="text-xs uppercase text-base-content/40">{storage.backend}</div></div>
@@ -264,9 +267,9 @@ export default function RecordingsPage() {
           {(storage.backend === 'ftp' || storage.backend === 's3' || storage.backend === 'nfs' || storage.backend === 'smb') && <label className="desklink-field"><span className="label text-xs text-base-content/60">目录前缀</span><input className="input input-bordered input-sm w-full" value={storage.prefix} onChange={(event) => setStorage((value) => ({ ...value, prefix: event.target.value }))} /></label>}
           {(storage.backend === 'ftp' || storage.backend === 's3') && <label className="desklink-field"><span className="label text-xs text-base-content/60">加密连接</span><span className="flex h-9 items-center justify-between rounded-md border border-base-300 px-3"><span className="text-xs text-base-content/50">TLS</span><input type="checkbox" className="toggle toggle-success toggle-sm" checked={storage.secure} onChange={(event) => setStorage((value) => ({ ...value, secure: event.target.checked }))} /></span></label>}
         </div>
-      </div>
+      </div>}
 
-      {policy.mode === 'selected' && (
+      {!readOnly && policy.mode === 'selected' && (
         <div className="desklink-card overflow-hidden">
           <div className="flex flex-wrap items-center gap-3 border-b border-base-300 px-5 py-4">
             <div><div className="text-sm font-semibold">录制设备</div><div className="text-xs text-base-content/45">已选择 {policy.peer_ids.length} 台设备</div></div>
@@ -287,15 +290,15 @@ export default function RecordingsPage() {
           <select className="select select-bordered select-sm w-28" value={statusFilter} onChange={(event) => { setPage(1); setStatusFilter(event.target.value) }}><option value="">全部状态</option><option value="complete">已完成</option><option value="uploading">上传中</option><option value="transcoding">转码中</option><option value="failed">失败</option></select>
           <input type="date" className="input input-bordered input-sm w-36" title="开始日期" value={startedAfter} onChange={(event) => { setPage(1); setStartedAfter(event.target.value) }} />
           <input type="date" className="input input-bordered input-sm w-36" title="结束日期" value={startedBefore} onChange={(event) => { setPage(1); setStartedBefore(event.target.value) }} />
-          {selectedIds.length > 0 && <button className="btn btn-error btn-outline btn-sm" onClick={() => void batchDelete()}><Trash2 size={14} />删除 {selectedIds.length} 项</button>}
+          {!readOnly && selectedIds.length > 0 && <button className="btn btn-error btn-outline btn-sm" onClick={() => void batchDelete()}><Trash2 size={14} />删除 {selectedIds.length} 项</button>}
           <button className="btn btn-ghost btn-sm" title="刷新" onClick={() => void loadRecords()}><RefreshCw size={15} /></button>
         </div>
         <div className="overflow-x-auto">
           <table className="table table-sm">
-            <thead><tr><th><input type="checkbox" className="checkbox checkbox-sm" aria-label="选择当前页" checked={records.list.length > 0 && records.list.every((record) => selectedIds.includes(record.id))} onChange={(event) => setSelectedIds(event.target.checked ? records.list.map((record) => record.id) : [])} /></th><th>开始时间</th><th>被控设备</th><th>控制方</th><th>时长</th><th>格式</th><th>大小</th><th>状态</th><th className="text-right">操作</th></tr></thead>
+            <thead><tr>{!readOnly && <th><input type="checkbox" className="checkbox checkbox-sm" aria-label="选择当前页" checked={records.list.length > 0 && records.list.every((record) => selectedIds.includes(record.id))} onChange={(event) => setSelectedIds(event.target.checked ? records.list.map((record) => record.id) : [])} /></th>}<th>开始时间</th><th>被控设备</th><th>控制方</th><th>时长</th><th>格式</th><th>大小</th><th>状态</th><th className="text-right">操作</th></tr></thead>
             <tbody>
-              {records.list.map((record) => <tr key={record.id}><td><input type="checkbox" className="checkbox checkbox-sm" aria-label={`选择录像 ${record.id}`} checked={selectedIds.includes(record.id)} onChange={() => setSelectedIds((ids) => ids.includes(record.id) ? ids.filter((id) => id !== record.id) : [...ids, record.id])} /></td><td className="whitespace-nowrap">{formatTime(record.started_at)}</td><td className="font-medium">{record.peer_id}</td><td><span className="block">{record.from_name || record.from_peer || '-'}</span>{record.from_name && record.from_peer && <span className="block text-xs text-base-content/40">{record.from_peer}</span>}</td><td>{formatDuration(record.duration_ms)}</td><td><span className="badge badge-ghost badge-sm uppercase">{record.codec || record.container}</span></td><td>{formatBytes(record.size)}</td><td><span className={`badge badge-sm ${record.status === 'complete' ? 'badge-success badge-soft' : record.status === 'failed' ? 'badge-error badge-soft' : 'badge-warning badge-soft'}`}>{record.status === 'complete' ? '已完成' : record.status === 'failed' ? '失败' : record.status === 'transcoding' ? '转码中' : '上传中'}</span></td><td><div className="flex justify-end gap-1"><button className="btn btn-ghost btn-xs" title="预览" disabled={record.status !== 'complete'} onClick={() => void requestAccess(record, false)}><Play size={14} /></button><button className="btn btn-ghost btn-xs" title="下载原始文件" disabled={record.status === 'uploading'} onClick={() => void requestAccess(record, true)}><Download size={14} /></button><button className="btn btn-ghost btn-xs" title={record.cursor_available ? '下载含鼠标录像' : '此录像没有鼠标轨迹'} disabled={record.status !== 'complete' || !record.cursor_available || cursorDownloads.includes(record.id)} onClick={() => void requestAccess(record, true, true)}>{cursorDownloads.includes(record.id) ? <span className="loading loading-spinner loading-xs" /> : <MousePointer2 size={14} />}</button><button className="btn btn-ghost btn-xs text-error" title="删除" onClick={() => void deleteRecording(record)}><Trash2 size={14} /></button></div></td></tr>)}
-              {!records.list.length && <tr><td colSpan={9}><div className="flex flex-col items-center gap-2 py-12 text-base-content/35"><Film size={30} strokeWidth={1.4} /><span className="text-sm">暂无会话录像</span></div></td></tr>}
+              {records.list.map((record) => <tr key={record.id}>{!readOnly && <td><input type="checkbox" className="checkbox checkbox-sm" aria-label={`选择录像 ${record.id}`} checked={selectedIds.includes(record.id)} onChange={() => setSelectedIds((ids) => ids.includes(record.id) ? ids.filter((id) => id !== record.id) : [...ids, record.id])} /></td>}<td className="whitespace-nowrap">{formatTime(record.started_at)}</td><td className="font-medium">{record.peer_id}</td><td><span className="block">{record.from_name || record.from_peer || '-'}</span>{record.from_name && record.from_peer && <span className="block text-xs text-base-content/40">{record.from_peer}</span>}</td><td>{formatDuration(record.duration_ms)}</td><td><span className="badge badge-ghost badge-sm uppercase">{record.codec || record.container}</span></td><td>{formatBytes(record.size)}</td><td><span className={`badge badge-sm ${record.status === 'complete' ? 'badge-success badge-soft' : record.status === 'failed' ? 'badge-error badge-soft' : 'badge-warning badge-soft'}`}>{record.status === 'complete' ? '已完成' : record.status === 'failed' ? '失败' : record.status === 'transcoding' ? '转码中' : '上传中'}</span></td><td><div className="flex justify-end gap-1"><button className="btn btn-ghost btn-xs" title="预览" disabled={record.status !== 'complete'} onClick={() => void requestAccess(record, false)}><Play size={14} /></button><button className="btn btn-ghost btn-xs" title="下载原始文件" disabled={record.status === 'uploading'} onClick={() => void requestAccess(record, true)}><Download size={14} /></button><button className="btn btn-ghost btn-xs" title={record.cursor_available ? '下载含鼠标录像' : '此录像没有鼠标轨迹'} disabled={record.status !== 'complete' || !record.cursor_available || cursorDownloads.includes(record.id)} onClick={() => void requestAccess(record, true, true)}>{cursorDownloads.includes(record.id) ? <span className="loading loading-spinner loading-xs" /> : <MousePointer2 size={14} />}</button>{!readOnly && <button className="btn btn-ghost btn-xs text-error" title="删除" onClick={() => void deleteRecording(record)}><Trash2 size={14} /></button>}</div></td></tr>)}
+              {!records.list.length && <tr><td colSpan={readOnly ? 8 : 9}><div className="flex flex-col items-center gap-2 py-12 text-base-content/35"><Film size={30} strokeWidth={1.4} /><span className="text-sm">暂无会话录像</span></div></td></tr>}
             </tbody>
           </table>
         </div>

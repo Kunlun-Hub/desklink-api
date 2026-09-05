@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const DatabaseVersion = 276
+const DatabaseVersion = 277
 
 // @title 管理系统API
 // @version 1.0
@@ -300,6 +300,7 @@ func Migrate(version uint) {
 	global.Logger.Info("Migrating....", version)
 	err := global.DB.AutoMigrate(
 		&model.Version{},
+		&model.Role{},
 		&model.User{},
 		&model.UserToken{},
 		&model.Tag{},
@@ -327,6 +328,9 @@ func Migrate(version uint) {
 	)
 	if err != nil {
 		global.Logger.Error("migrate err :=>", err)
+	}
+	if err := service.AllService.RoleService.EnsureBuiltIns(); err != nil {
+		global.Logger.Error("role seed error :=>", err)
 	}
 	global.DB.Create(&model.Version{Version: version})
 	//如果是初次则创建一个默认用户
@@ -359,6 +363,10 @@ func Migrate(version uint) {
 			Status:   model.COMMON_STATUS_ENABLE,
 			IsAdmin:  &is_admin,
 			GroupId:  1,
+		}
+		var adminRole model.Role
+		if global.DB.Where("code = ?", "admin").First(&adminRole).Error == nil {
+			admin.RoleId = adminRole.Id
 		}
 
 		// 生成随机密码

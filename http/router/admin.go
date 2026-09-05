@@ -28,6 +28,7 @@ func Init(g *gin.Engine) {
 	adg.Use(middleware.BackendUserAuth())
 	//FileBind(adg)
 	UserBind(adg)
+	RoleBind(adg)
 	GroupBind(adg)
 	TagBind(adg)
 	AddressBookBind(adg)
@@ -80,13 +81,25 @@ func RecordingBind(rg *gin.RouterGroup) {
 
 func RustdeskCmdBind(adg *gin.RouterGroup) {
 	cont := &admin.Rustdesk{}
-	rg := adg.Group("/rustdesk")
+	rg := adg.Group("/rustdesk").Use(middleware.AdminPrivilege())
 	rg.POST("/sendCmd", cont.SendCmd)
 	rg.GET("/cmdList", cont.CmdList)
 	rg.POST("/cmdDelete", cont.CmdDelete)
 	rg.POST("/cmdCreate", cont.CmdCreate)
 	rg.POST("/cmdUpdate", cont.CmdUpdate)
 }
+
+func RoleBind(rg *gin.RouterGroup) {
+	r := rg.Group("/role").Use(middleware.RolePrivilege())
+	cont := &admin.Role{}
+	r.GET("/list", cont.List)
+	r.GET("/options", cont.Options)
+	r.GET("/permissions", cont.Permissions)
+	r.POST("/create", cont.Create)
+	r.POST("/update", cont.Update)
+	r.POST("/delete", cont.Delete)
+}
+
 func LoginBind(rg *gin.RouterGroup) {
 	cont := &admin.Login{}
 	rg.POST("/login", cont.Login)

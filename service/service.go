@@ -13,6 +13,7 @@ type Service struct {
 	//AdminService     *AdminService
 	//AdminRoleService *AdminRoleService
 	*UserService
+	*RoleService
 	*AddressBookService
 	*TagService
 	*PeerService
@@ -49,7 +50,7 @@ func New(c *config.Config, g *gorm.DB, l *log.Logger, j *jwt.Jwt, lo lock.Locker
 	Logger = l
 	Jwt = j
 	Lock = lo
-	AllService = new(Service)
+	AllService = &Service{UserService: &UserService{}, RoleService: &RoleService{}}
 	return AllService
 }
 

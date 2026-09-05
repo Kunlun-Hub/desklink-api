@@ -12,6 +12,7 @@ import ProfilePage from './pages/ProfilePage'
 import RegisterPage from './pages/RegisterPage'
 import SettingsPage from './pages/SettingsPage'
 import RecordingsPage from './pages/RecordingsPage'
+import RolesPage from './pages/RolesPage'
 
 function ProtectedLayout() {
   const { user, loading } = useAuth()
@@ -21,9 +22,9 @@ function ProtectedLayout() {
   return <AppLayout />
 }
 
-function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAdmin } = useAuth()
-  return isAdmin ? children : <Navigate to="/" replace />
+function AdminRoute({ children, permission }: { children: React.ReactNode; permission?: string }) {
+  const { hasPermission } = useAuth()
+  return (!permission || hasPermission(permission)) ? children : <Navigate to="/" replace />
 }
 
 function ApplicationRoutes() {
@@ -41,24 +42,25 @@ function ApplicationRoutes() {
         <Route path="my/collection-rules" element={<ResourcePage config={resources.myCollectionRules} />} />
         <Route path="my/shares" element={<ResourcePage config={resources.myShares} />} />
         <Route path="my/login-logs" element={<ResourcePage config={resources.myLoginLogs} />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="admin/devices" element={<AdminRoute><ResourcePage config={resources.devices} /></AdminRoute>} />
-        <Route path="admin/users" element={<AdminRoute><ResourcePage config={resources.users} /></AdminRoute>} />
-        <Route path="admin/groups" element={<AdminRoute><ResourcePage config={resources.groups} /></AdminRoute>} />
-        <Route path="admin/device-groups" element={<AdminRoute><ResourcePage config={resources.deviceGroups} /></AdminRoute>} />
-        <Route path="admin/address-books" element={<AdminRoute><ResourcePage config={resources.addressBooks} /></AdminRoute>} />
-        <Route path="admin/collections" element={<AdminRoute><ResourcePage config={resources.collections} /></AdminRoute>} />
-        <Route path="admin/collection-rules" element={<AdminRoute><ResourcePage config={resources.collectionRules} /></AdminRoute>} />
-        <Route path="admin/tags" element={<AdminRoute><ResourcePage config={resources.tags} /></AdminRoute>} />
-        <Route path="admin/login-logs" element={<AdminRoute><ResourcePage config={resources.loginLogs} /></AdminRoute>} />
-        <Route path="admin/connection-audit" element={<AdminRoute><ResourcePage config={resources.connectionAudit} /></AdminRoute>} />
-        <Route path="admin/access-rules" element={<AdminRoute><ResourcePage config={resources.accessRules} /></AdminRoute>} />
-        <Route path="admin/file-audit" element={<AdminRoute><ResourcePage config={resources.fileAudit} /></AdminRoute>} />
-        <Route path="admin/recordings" element={<AdminRoute><RecordingsPage /></AdminRoute>} />
-        <Route path="admin/tokens" element={<AdminRoute><ResourcePage config={resources.tokens} /></AdminRoute>} />
-        <Route path="admin/shares" element={<AdminRoute><ResourcePage config={resources.shares} /></AdminRoute>} />
-        <Route path="admin/commands" element={<AdminRoute><CommandsPage /></AdminRoute>} />
-        <Route path="admin/oauth" element={<AdminRoute><ResourcePage config={resources.oauth} /></AdminRoute>} />
+        <Route path="settings" element={<AdminRoute permission="settings"><SettingsPage /></AdminRoute>} />
+        <Route path="admin/devices" element={<AdminRoute permission="devices"><ResourcePage config={resources.devices} /></AdminRoute>} />
+        <Route path="admin/users" element={<AdminRoute permission="users"><ResourcePage config={resources.users} /></AdminRoute>} />
+        <Route path="admin/groups" element={<AdminRoute permission="groups"><ResourcePage config={resources.groups} /></AdminRoute>} />
+        <Route path="admin/device-groups" element={<AdminRoute permission="device-groups"><ResourcePage config={resources.deviceGroups} /></AdminRoute>} />
+        <Route path="admin/address-books" element={<AdminRoute permission="address-books"><ResourcePage config={resources.addressBooks} /></AdminRoute>} />
+        <Route path="admin/collections" element={<AdminRoute permission="collections"><ResourcePage config={resources.collections} /></AdminRoute>} />
+        <Route path="admin/collection-rules" element={<AdminRoute permission="collection-rules"><ResourcePage config={resources.collectionRules} /></AdminRoute>} />
+        <Route path="admin/tags" element={<AdminRoute permission="tags"><ResourcePage config={resources.tags} /></AdminRoute>} />
+        <Route path="admin/login-logs" element={<AdminRoute permission="login-logs"><ResourcePage config={resources.loginLogs} /></AdminRoute>} />
+        <Route path="admin/connection-audit" element={<AdminRoute permission="connection-audit"><ResourcePage config={resources.connectionAudit} /></AdminRoute>} />
+        <Route path="admin/access-rules" element={<AdminRoute permission="access-rules"><ResourcePage config={resources.accessRules} /></AdminRoute>} />
+        <Route path="admin/file-audit" element={<AdminRoute permission="file-audit"><ResourcePage config={resources.fileAudit} /></AdminRoute>} />
+        <Route path="admin/recordings" element={<AdminRoute permission="recordings"><RecordingsPage /></AdminRoute>} />
+        <Route path="admin/tokens" element={<AdminRoute permission="tokens"><ResourcePage config={resources.tokens} /></AdminRoute>} />
+        <Route path="admin/shares" element={<AdminRoute permission="shares"><ResourcePage config={resources.shares} /></AdminRoute>} />
+        <Route path="admin/commands" element={<AdminRoute permission="commands"><CommandsPage /></AdminRoute>} />
+        <Route path="admin/oauth" element={<AdminRoute permission="oauth"><ResourcePage config={resources.oauth} /></AdminRoute>} />
+        <Route path="admin/roles" element={<AdminRoute permission="roles"><RolesPage /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

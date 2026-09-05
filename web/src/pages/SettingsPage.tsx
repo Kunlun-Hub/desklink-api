@@ -9,7 +9,7 @@ interface AgentMetricsConfig { interval_seconds: number }
 
 export default function SettingsPage() {
   const { show } = useToast()
-  const { isAdmin } = useAuth()
+  const { hasPermission } = useAuth()
   const [config, setConfig] = useState<Config | null>(null)
   const [metrics, setMetrics] = useState<AgentMetricsConfig | null>(null)
   const [interval, setIntervalValue] = useState('5')
@@ -44,7 +44,7 @@ export default function SettingsPage() {
           })}
         </div>
       </div>
-      {isAdmin && <div className="desklink-card mt-5 overflow-hidden">
+      {hasPermission('settings') && <div className="desklink-card mt-5 overflow-hidden">
         <div className="border-b border-base-300 p-5"><h2 className="text-sm font-semibold">Agent 采集设置</h2><p className="mt-1 text-xs text-base-content/50">控制客户端 CPU、内存、磁盘指标的上报频率，范围 5 到 3600 秒。</p></div>
         <div className="flex flex-wrap items-end gap-3 p-5"><label className="desklink-field w-56"><span className="label text-xs text-base-content/60">采集间隔（秒）</span><input className="input input-bordered input-sm" type="number" min="5" max="3600" value={interval} onChange={(event) => setIntervalValue(event.target.value)} /></label><button className="btn btn-sm desklink-action border-0 bg-emerald-600 px-4 text-white hover:bg-emerald-700" disabled={saving || !metrics} onClick={() => void saveMetrics()}>{saving ? '保存中…' : '保存设置'}</button></div>
       </div>}

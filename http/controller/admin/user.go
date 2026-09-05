@@ -66,6 +66,19 @@ func (ct *User) Create(c *gin.Context) {
 		return
 	}
 	u := f.ToUser()
+	actor := service.AllService.UserService.CurUser(c)
+	roleID := uint(0)
+	if f.RoleId != nil {
+		roleID = *f.RoleId
+	}
+	if !service.AllService.UserService.IsAdmin(actor) && service.AllService.UserService.IsAdmin(u) {
+		response.Fail(c, 403, response.TranslateMsg(c, "NoAccess"))
+		return
+	}
+	if !service.AllService.RoleService.CanAssignRole(actor, roleID) {
+		response.Fail(c, 403, response.TranslateMsg(c, "NoAccess"))
+		return
+	}
 	err := service.AllService.UserService.Create(u)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
@@ -128,6 +141,23 @@ func (ct *User) Update(c *gin.Context) {
 		return
 	}
 	u := f.ToUser()
+	actor := service.AllService.UserService.CurUser(c)
+	current := service.AllService.UserService.InfoById(u.Id)
+	if f.RoleId == nil {
+		u.RoleId = current.RoleId
+	}
+	if !ct.canManage(actor, current) {
+		response.Fail(c, 403, response.TranslateMsg(c, "NoAccess"))
+		return
+	}
+	if !service.AllService.UserService.IsAdmin(actor) && service.AllService.UserService.IsAdmin(u) {
+		response.Fail(c, 403, response.TranslateMsg(c, "NoAccess"))
+		return
+	}
+	if !service.AllService.RoleService.CanAssignRole(actor, u.RoleId) {
+		response.Fail(c, 403, response.TranslateMsg(c, "NoAccess"))
+		return
+	}
 	err := service.AllService.UserService.Update(u)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
@@ -161,6 +191,11 @@ func (ct *User) Delete(c *gin.Context) {
 	}
 	u := service.AllService.UserService.InfoById(f.Id)
 	if u.Id > 0 {
+		actor := service.AllService.UserService.CurUser(c)
+		if !ct.canManage(actor, u) {
+			response.Fail(c, 403, response.TranslateMsg(c, "NoAccess"))
+			return
+		}
 		err := service.AllService.UserService.Delete(u)
 		if err == nil {
 			response.Success(c, nil)
@@ -199,12 +234,27 @@ func (ct *User) UpdatePassword(c *gin.Context) {
 		response.Fail(c, 101, response.TranslateMsg(c, "ItemNotFound"))
 		return
 	}
+	actor := service.AllService.UserService.CurUser(c)
+	if !ct.canManage(actor, u) {
+		response.Fail(c, 403, response.TranslateMsg(c, "NoAccess"))
+		return
+	}
 	err := service.AllService.UserService.UpdatePassword(u, f.Password)
 	if err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
 		return
 	}
 	response.Success(c, nil)
+}
+
+func (ct *User) canManage(actor, target *model.User) bool {
+	if service.AllService.UserService.IsAdmin(actor) {
+		return true
+	}
+	if target == nil || target.Id == 0 || service.AllService.UserService.IsAdmin(target) {
+		return false
+	}
+	return service.AllService.RoleService.CanAssignRole(actor, target.RoleId)
 }
 
 // Current 当前用户

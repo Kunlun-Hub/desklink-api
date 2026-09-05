@@ -238,5 +238,8 @@ func responseLoginSuccess(c *gin.Context, u *model.User, token string) {
 	lp.FromUser(u)
 	lp.Token = token
 	lp.RouteNames = service.AllService.UserService.RouteNames(u)
+	if service.AllService.RoleService != nil {
+		lp.Permissions = service.AllService.RoleService.PermissionsForUser(u)
+	}
 	response.Success(c, lp)
 }

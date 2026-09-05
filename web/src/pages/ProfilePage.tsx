@@ -59,7 +59,7 @@ export default function ProfilePage() {
           <dl className="space-y-4 text-sm">
             <div className="flex items-center justify-between border-b border-base-200 pb-3"><dt className="flex items-center gap-2 text-base-content/50"><UserRound size={15} />用户名</dt><dd className="font-medium">{user?.username}</dd></div>
             <div className="flex items-center justify-between border-b border-base-200 pb-3"><dt className="flex items-center gap-2 text-base-content/50"><Mail size={15} />邮箱</dt><dd>{user?.email || '未设置'}</dd></div>
-            <div className="flex items-center justify-between"><dt className="flex items-center gap-2 text-base-content/50"><ShieldCheck size={15} />权限</dt><dd><span className="badge badge-success badge-soft badge-sm">{user?.route_names?.includes('*') ? '管理员' : '普通用户'}</span></dd></div>
+            <div className="flex items-center justify-between"><dt className="flex items-center gap-2 text-base-content/50"><ShieldCheck size={15} />角色</dt><dd><span className="badge badge-success badge-soft badge-sm">{user?.role_name || (user?.route_names?.includes('*') ? '管理员' : '普通用户')}</span></dd></div>
           </dl>
         </div>
         <form data-testid="password-form" className="desklink-card flex h-full flex-col p-5" onSubmit={(event) => void changePassword(event)}>

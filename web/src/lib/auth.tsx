@@ -8,6 +8,10 @@ export interface SessionUser {
   email?: string
   avatar?: string
   is_admin?: boolean
+  role_id?: number
+  role_name?: string
+  role_code?: string
+  permissions?: string[]
   route_names?: string[]
   token: string
 }
@@ -24,6 +28,7 @@ interface AuthContextValue {
   user: SessionUser | null
   loading: boolean
   isAdmin: boolean
+  hasPermission: (permission: string) => boolean
   login: (input: LoginInput) => Promise<void>
   register: (input: { username: string; email: string; password: string; confirm_password: string }) => Promise<void>
   completeOidc: (code: string) => Promise<void>
@@ -99,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     loading,
     isAdmin: Boolean(user?.is_admin || user?.route_names?.includes('*')),
+    hasPermission: (permission: string) => Boolean(user?.is_admin || user?.route_names?.includes('*') || user?.permissions?.includes('*') || user?.permissions?.includes(permission)),
     login,
     register,
     completeOidc,

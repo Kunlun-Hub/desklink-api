@@ -19,14 +19,14 @@ type UserService struct {
 // InfoById 根据用户id取用户信息
 func (us *UserService) InfoById(id uint) *model.User {
 	u := &model.User{}
-	DB.Where("id = ?", id).First(u)
+	DB.Preload("Role").Where("id = ?", id).First(u)
 	return u
 }
 
 // InfoByUsername 根据用户名取用户信息
 func (us *UserService) InfoByUsername(un string) *model.User {
 	u := &model.User{}
-	DB.Where("username = ?", un).First(u)
+	DB.Preload("Role").Where("username = ?", un).First(u)
 	return u
 }
 
@@ -55,7 +55,7 @@ func (us *UserService) InfoByUsernamePassword(username, password string) *model.
 		Logger.Warn("Fallback to local database")
 	}
 	u := &model.User{}
-	DB.Where("username = ?", username).First(u)
+	DB.Preload("Role").Where("username = ?", username).First(u)
 	if u.Id == 0 {
 		return u
 	}
@@ -81,7 +81,7 @@ func (us *UserService) InfoByAccessToken(token string) (*model.User, *model.User
 	if ut.ExpiredAt < time.Now().Unix() {
 		return u, ut
 	}
-	DB.Where("id = ?", ut.UserId).First(u)
+	DB.Preload("Role").Where("id = ?", ut.UserId).First(u)
 	return u, ut
 }
 
@@ -132,7 +132,7 @@ func (us *UserService) List(page, pageSize uint, where func(tx *gorm.DB)) (res *
 	}
 	tx.Count(&res.Total)
 	tx.Scopes(Paginate(page, pageSize))
-	tx.Find(&res.Users)
+	tx.Preload("Role").Find(&res.Users)
 	return
 }
 
@@ -177,6 +177,15 @@ func (us *UserService) Create(u *model.User) error {
 	if us.IsUsernameExists(u.Username) {
 		return errors.New("UsernameExists")
 	}
+	isAdmin := false
+	if u.RoleId > 0 && AllService != nil && AllService.RoleService != nil {
+		role := AllService.RoleService.InfoById(u.RoleId)
+		if role.Id == 0 || role.Status != model.COMMON_STATUS_ENABLE {
+			return errors.New("invalid role")
+		}
+		isAdmin = role.Code == "admin"
+	}
+	u.IsAdmin = &isAdmin
 	var err error
 	u.Password, err = utils.EncryptPassword(u.Password)
 	if err != nil {
@@ -253,6 +262,20 @@ func (us *UserService) Delete(u *model.User) error {
 // Update 更新
 func (us *UserService) Update(u *model.User) error {
 	currentUser := us.InfoById(u.Id)
+	isAdmin := us.IsAdmin(u)
+	if u.IsAdmin != nil {
+		isAdmin = *u.IsAdmin
+	} else if currentUser.IsAdmin != nil {
+		isAdmin = *currentUser.IsAdmin
+	}
+	if u.RoleId > 0 && AllService != nil && AllService.RoleService != nil {
+		role := AllService.RoleService.InfoById(u.RoleId)
+		if role.Id == 0 || role.Status != model.COMMON_STATUS_ENABLE {
+			return errors.New("invalid role")
+		}
+		isAdmin = role.Code == "admin"
+	}
+	u.IsAdmin = &isAdmin
 	// 如果当前用户是管理员并且 IsAdmin 不为空，进行检查
 	if us.IsAdmin(currentUser) {
 		adminCount := us.getAdminUserCount()
@@ -261,7 +284,7 @@ func (us *UserService) Update(u *model.User) error {
 			return errors.New("The last admin user cannot be disabled or demoted")
 		}
 	}
-	return DB.Model(u).Updates(u).Error
+	return DB.Model(u).Updates(u).Update("role_id", u.RoleId).Error
 }
 
 // FlushToken 清空token
@@ -296,7 +319,7 @@ func (us *UserService) UpdatePassword(u *model.User, password string) error {
 
 // IsAdmin 是否管理员
 func (us *UserService) IsAdmin(u *model.User) bool {
-	return u != nil && *u.IsAdmin
+	return u != nil && u.IsAdmin != nil && *u.IsAdmin
 }
 
 // RouteNames

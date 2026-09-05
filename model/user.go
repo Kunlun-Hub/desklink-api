@@ -10,6 +10,8 @@ type User struct {
 	Avatar   string     `json:"avatar" gorm:"default:'';not null;"`
 	GroupId  uint       `json:"group_id" gorm:"default:0;not null;index"`
 	IsAdmin  *bool      `json:"is_admin" gorm:"default:0;not null;"`
+	RoleId   uint       `json:"role_id" gorm:"default:0;not null;index"`
+	Role     *Role      `json:"role,omitempty" gorm:"foreignKey:RoleId"`
 	Status   StatusCode `json:"status" gorm:"default:1;not null;"`
 	Remark   string     `json:"remark" gorm:"default:'';not null;"`
 	TimeModel

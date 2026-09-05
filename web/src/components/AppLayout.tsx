@@ -33,6 +33,7 @@ interface NavItem {
   path: string
   icon: typeof LayoutDashboard
   admin?: boolean
+  permission?: string
 }
 
 interface NavGroup {
@@ -58,44 +59,45 @@ const groups: NavGroup[] = [
   {
     label: '资源管理',
     items: [
-      { label: '设备', path: '/admin/devices', icon: Cpu, admin: true },
-      { label: '用户', path: '/admin/users', icon: Users, admin: true },
-      { label: '用户组', path: '/admin/groups', icon: UsersRound, admin: true },
-      { label: '设备组', path: '/admin/device-groups', icon: Network, admin: true },
-      { label: '地址簿', path: '/admin/address-books', icon: ContactRound, admin: true },
-      { label: '地址簿集合', path: '/admin/collections', icon: FolderKanban, admin: true },
-      { label: '共享规则', path: '/admin/collection-rules', icon: Share2, admin: true },
-      { label: '标签', path: '/admin/tags', icon: Tags, admin: true },
+      { label: '设备', path: '/admin/devices', icon: Cpu, admin: true, permission: 'devices' },
+      { label: '用户', path: '/admin/users', icon: Users, admin: true, permission: 'users' },
+      { label: '用户组', path: '/admin/groups', icon: UsersRound, admin: true, permission: 'groups' },
+      { label: '设备组', path: '/admin/device-groups', icon: Network, admin: true, permission: 'device-groups' },
+      { label: '地址簿', path: '/admin/address-books', icon: ContactRound, admin: true, permission: 'address-books' },
+      { label: '地址簿集合', path: '/admin/collections', icon: FolderKanban, admin: true, permission: 'collections' },
+      { label: '共享规则', path: '/admin/collection-rules', icon: Share2, admin: true, permission: 'collection-rules' },
+      { label: '标签', path: '/admin/tags', icon: Tags, admin: true, permission: 'tags' },
     ],
   },
   {
     label: '安全审计',
     items: [
-      { label: '登录日志', path: '/admin/login-logs', icon: FileClock, admin: true },
-      { label: '连接审计', path: '/admin/connection-audit', icon: Activity, admin: true },
-      { label: '授权管理', path: '/admin/access-rules', icon: ShieldCheck, admin: true },
-      { label: '文件审计', path: '/admin/file-audit', icon: ShieldCheck, admin: true },
-      { label: '会话录像', path: '/admin/recordings', icon: Video, admin: true },
-      { label: '访问令牌', path: '/admin/tokens', icon: KeyRound, admin: true },
-      { label: '分享记录', path: '/admin/shares', icon: Share2, admin: true },
+      { label: '登录日志', path: '/admin/login-logs', icon: FileClock, admin: true, permission: 'login-logs' },
+      { label: '连接审计', path: '/admin/connection-audit', icon: Activity, admin: true, permission: 'connection-audit' },
+      { label: '授权管理', path: '/admin/access-rules', icon: ShieldCheck, admin: true, permission: 'access-rules' },
+      { label: '文件审计', path: '/admin/file-audit', icon: ShieldCheck, admin: true, permission: 'file-audit' },
+      { label: '会话录像', path: '/admin/recordings', icon: Video, admin: true, permission: 'recordings' },
+      { label: '访问令牌', path: '/admin/tokens', icon: KeyRound, admin: true, permission: 'tokens' },
+      { label: '分享记录', path: '/admin/shares', icon: Share2, admin: true, permission: 'shares' },
     ],
   },
   {
     label: '服务配置',
     items: [
-      { label: '服务指令', path: '/admin/commands', icon: Command, admin: true },
-      { label: 'OAuth / OIDC', path: '/admin/oauth', icon: UserCog, admin: true },
-      { label: '系统信息', path: '/settings', icon: Settings },
+      { label: '服务指令', path: '/admin/commands', icon: Command, admin: true, permission: 'commands' },
+      { label: 'OAuth / OIDC', path: '/admin/oauth', icon: UserCog, admin: true, permission: 'oauth' },
+      { label: '角色权限', path: '/admin/roles', icon: ShieldCheck, admin: true, permission: 'roles' },
+      { label: '系统信息', path: '/settings', icon: Settings, admin: true, permission: 'settings' },
     ],
   },
 ]
 
 function Navigation({ close }: { close?: () => void }) {
-  const { isAdmin } = useAuth()
+  const { isAdmin, hasPermission } = useAuth()
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-4">
       {groups.map((group) => {
-        const items = group.items.filter((item) => !item.admin || isAdmin)
+        const items = group.items.filter((item) => !item.admin || (item.permission === 'roles' ? isAdmin : Boolean(item.permission && hasPermission(item.permission))))
         if (!items.length) return null
         return (
           <div key={group.label} className="mb-5">
@@ -142,7 +144,7 @@ export default function AppLayout() {
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400"><CircleUserRound size={17} /></div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium text-white">{user?.nickname || user?.username}</div>
-              <div className="text-[10px] text-white/35">{isAdmin ? '管理员' : '用户'}</div>
+              <div className="truncate text-[10px] text-white/35">{user?.role_name || (isAdmin ? '管理员' : '普通用户')}</div>
             </div>
             <button className="btn btn-ghost btn-xs text-white/50 hover:text-white" onClick={() => void logout()} title="退出登录"><LogOut size={15} /></button>
           </div>

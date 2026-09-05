@@ -8,7 +8,7 @@ interface ServerConfig { id_server: string; relay_server: string; api_server: st
 interface AdminConfig { title: string; hello?: string }
 
 export default function DashboardPage() {
-  const { user, isAdmin } = useAuth()
+  const { user, hasPermission } = useAuth()
   const { show } = useToast()
   const [counts, setCounts] = useState({ users: 0, devices: 0, onlineDevices: 0, addressBooks: 0, logs: 0 })
   const [server, setServer] = useState<ServerConfig | null>(null)
@@ -19,9 +19,16 @@ export default function DashboardPage() {
     const load = async () => {
       try {
         const common = [get<AdminConfig>('/config/admin'), get<ServerConfig>('/config/server')]
-        const metricRequests = isAdmin
-          ? [get<PageData<unknown>>('/user/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/peer/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/peer/list', { page: 1, page_size: 1, online: 'true' }), get<PageData<unknown>>('/address_book/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/audit_conn/list', { page: 1, page_size: 1 })]
-          : [Promise.resolve(undefined), get<PageData<unknown>>('/my/peer/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/my/peer/list', { page: 1, page_size: 1, online: 'true' }), get<PageData<unknown>>('/my/address_book/list', { page: 1, page_size: 1 }), get<PageData<unknown>>('/my/login_log/list', { page: 1, page_size: 1 })]
+        const managedDevices = hasPermission('devices')
+        const managedAddressBooks = hasPermission('address-books')
+        const connectionAudit = hasPermission('connection-audit')
+        const metricRequests = [
+          hasPermission('users') ? get<PageData<unknown>>('/user/list', { page: 1, page_size: 1 }) : Promise.resolve(undefined),
+          get<PageData<unknown>>(managedDevices ? '/peer/list' : '/my/peer/list', { page: 1, page_size: 1 }),
+          get<PageData<unknown>>(managedDevices ? '/peer/list' : '/my/peer/list', { page: 1, page_size: 1, online: 'true' }),
+          get<PageData<unknown>>(managedAddressBooks ? '/address_book/list' : '/my/address_book/list', { page: 1, page_size: 1 }),
+          get<PageData<unknown>>(connectionAudit ? '/audit_conn/list' : '/my/login_log/list', { page: 1, page_size: 1 }),
+        ]
         const [adminResult, serverResult, users, devices, onlineDevices, addressBooks, logs] = await Promise.all([...common, ...metricRequests])
         setAdminConfig(adminResult as AdminConfig)
         setServer(serverResult as ServerConfig)
@@ -30,14 +37,14 @@ export default function DashboardPage() {
       finally { setLoading(false) }
     }
     void load()
-  }, [isAdmin, show])
+  }, [hasPermission, show])
 
   const stats = [
-    ...(isAdmin ? [{ label: '用户总数', value: counts.users, icon: Users, color: 'text-sky-600 bg-sky-50' }] : []),
+    ...(hasPermission('users') ? [{ label: '用户总数', value: counts.users, icon: Users, color: 'text-sky-600 bg-sky-50' }] : []),
     { label: '设备总数', value: counts.devices, icon: Cpu, color: 'text-emerald-600 bg-emerald-50' },
     { label: '在线设备', value: counts.onlineDevices, icon: Server, color: 'text-cyan-600 bg-cyan-50' },
     { label: '地址簿条目', value: counts.addressBooks, icon: BookUser, color: 'text-violet-600 bg-violet-50' },
-    { label: isAdmin ? '连接记录' : '登录记录', value: counts.logs, icon: Activity, color: 'text-amber-600 bg-amber-50' },
+    { label: hasPermission('connection-audit') ? '连接记录' : '登录记录', value: counts.logs, icon: Activity, color: 'text-amber-600 bg-amber-50' },
   ]
 
   return (
@@ -46,7 +53,7 @@ export default function DashboardPage() {
         <h1 className="text-xl font-semibold">你好，{user?.nickname || user?.username}</h1>
         <p className="mt-1 text-sm text-base-content/50">{adminConfig?.hello ? adminConfig.hello.replace(/<[^>]*>/g, '') : '查看 DeskLink 社区服务的关键状态。'}</p>
       </div>
-      <div className={`grid gap-4 sm:grid-cols-2 ${isAdmin ? 'xl:grid-cols-4' : 'xl:grid-cols-3'}`}>
+      <div className={`grid gap-4 sm:grid-cols-2 ${hasPermission('users') ? 'xl:grid-cols-4' : 'xl:grid-cols-3'}`}>
         {stats.map((item) => {
           const Icon = item.icon
           return (

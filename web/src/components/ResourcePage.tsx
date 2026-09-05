@@ -3,8 +3,10 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Eye, LoaderCirc
 import { errorMessage, get, normalizePage, post, type PageData } from '../lib/api'
 import { useToast } from './Toast'
 import type { ResourceColumn, ResourceConfig, ResourceField } from '../features/resources'
+import { useAuth } from '../lib/auth'
 
 type Row = Record<string, any>
+type RoleOption = { id: number; name: string; code: string; built_in?: boolean }
 
 const detailLabels: Record<string, string> = {
   peer: '设备信息', disks: '磁盘明细', id: '设备 ID', alias: '别名', hostname: '主机名', os: '操作系统', username: '系统用户', uuid: 'UUID', version: '客户端版本', last_online_ip: '当前/最近 IP', online: '在线状态', last_online_time: '最后在线', cpu: 'CPU 摘要', cpu_usage: 'CPU 使用率', memory: '内存摘要', memory_total: '内存总量', memory_used: '内存已用', memory_usage: '内存使用率', disk_read_bps: '磁盘读取速率', disk_write_bps: '磁盘写入速率', metrics_at: '指标更新时间', mount: '挂载点', total: '总容量', used: '已用容量', usage: '使用率',
@@ -253,6 +255,10 @@ function Cell({ column, value }: { column: ResourceColumn; value: unknown }) {
     return <span className="font-mono text-xs">{text ? `${text.slice(0, 7)}••••${text.slice(-4)}` : '—'}</span>
   }
   if (column.format === 'platform') return <span className="capitalize">{String(value || '—')}</span>
+  if (column.format === 'role') {
+    const role = value && typeof value === 'object' ? value as RoleOption : null
+    return role ? <span className="badge badge-outline badge-sm">{role.name}</span> : <span className="text-base-content/35">普通用户</span>
+  }
   if (typeof value === 'boolean') return value ? '是' : '否'
   return <span className="max-w-[260px] truncate" title={String(value ?? '')}>{value === null || value === undefined || value === '' ? '—' : String(value)}</span>
 }
@@ -282,6 +288,18 @@ function FormField({ field, value, onChange, required }: { field: ResourceField;
       </label>
     )
   }
+  if (field.kind === 'role') {
+    const roles = (field.options || []) as Array<{ label: string; value: string | number }>
+    return (
+      <label className="desklink-field">
+        <span className="label text-xs text-base-content/60">{field.label}{required && <span className="ml-1 text-error">*</span>}</span>
+        <select className="select select-bordered select-sm w-full" value={String(value ?? 0)} onChange={(event) => onChange(Number(event.target.value) || 0)} required={required}>
+          <option value="0">不指定角色</option>
+          {roles.map((option) => <option key={String(option.value)} value={String(option.value)}>{option.label}</option>)}
+        </select>
+      </label>
+    )
+  }
   const display = field.kind === 'tags' && Array.isArray(value) ? value.join(', ') : String(value ?? '')
   return (
     <label className="desklink-field">
@@ -297,6 +315,7 @@ function FormField({ field, value, onChange, required }: { field: ResourceField;
 
 export default function ResourcePage({ config }: { config: ResourceConfig }) {
   const { show } = useToast()
+  const { isAdmin, user } = useAuth()
   const [data, setData] = useState<PageData<Row>>(normalizePage())
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -305,6 +324,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
   const [editing, setEditing] = useState<Row | null | undefined>(undefined)
   const [form, setForm] = useState<Row>({})
   const [users, setUsers] = useState<Record<string, string>>({})
+  const [roles, setRoles] = useState<RoleOption[]>([])
   const [detail, setDetail] = useState<Row | null>(null)
   const [detailSamples, setDetailSamples] = useState<MetricSample[]>([])
   const [detailRange, setDetailRange] = useState('24h')
@@ -314,6 +334,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
   const [revealingCredential, setRevealingCredential] = useState<'temporary' | 'permanent' | null>(null)
   const credentialHideTimer = useRef<number | null>(null)
   const pageSize = config.pageSize || 20
+  const readOnly = Boolean(config.readOnly || user?.role_code === 'auditor')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -336,6 +357,11 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
       .then((response) => setUsers(Object.fromEntries(normalizePage(response).list.map((user) => [String(user.id), String(user.username || user.nickname || user.id)]))))
       .catch(() => setUsers({}))
   }, [config.columns])
+
+  useEffect(() => {
+    if (config.key !== 'users' || !isAdmin) return
+    get<RoleOption[]>('/role/options').then((value) => setRoles(Array.isArray(value) ? value : [])).catch(() => setRoles([]))
+  }, [config.key, isAdmin])
 
   const totalPages = Math.max(1, Math.ceil(data.total / pageSize))
   const startCreate = () => {
@@ -362,7 +388,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
       } else {
         setDetailSamples([])
       }
-      if (config.credentialsPath) {
+      if (config.credentialsPath && isAdmin) {
         setCredentialStatus(await get<DeviceCredentialStatus>(`${config.credentialsPath}/${row[config.idKey || 'id']}`))
       } else {
         setCredentialStatus(null)
@@ -426,14 +452,14 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
         const to = detailCustomRange?.to ?? currentTo
         const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${detailId}`, { from, to })
         setDetailSamples(metrics.samples || [])
-        if (config.credentialsPath) setCredentialStatus(await get<DeviceCredentialStatus>(`${config.credentialsPath}/${detailId}`))
+        if (config.credentialsPath && isAdmin) setCredentialStatus(await get<DeviceCredentialStatus>(`${config.credentialsPath}/${detailId}`))
       } catch {
         // Keep the last successful detail visible during transient requests.
       }
     }
     const timer = window.setInterval(() => { void refresh() }, 5000)
     return () => window.clearInterval(timer)
-  }, [config.credentialsPath, config.detailPath, config.metricsPath, detailCustomRange, detailId, detailRange])
+  }, [config.credentialsPath, config.detailPath, config.metricsPath, detailCustomRange, detailId, detailRange, isAdmin])
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
@@ -459,10 +485,11 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
   }
 
   const visibleFields = useMemo(() => config.fields?.filter((field) => {
+    if (field.kind === 'role' && !isAdmin) return false
     if (editing ? field.createOnly : field.editOnly) return false
     if (!field.visibleWhen) return true
     return field.visibleWhen.values.some((value) => String(value) === String(form[field.visibleWhen!.key]))
-  }) || [], [config.fields, editing, form])
+  }).map((field) => field.kind === 'role' ? { ...field, options: roles.map((role) => ({ label: `${role.name} (${role.code})`, value: role.id })) } : field) || [], [config.fields, editing, form, isAdmin, roles])
   const modalResourceName = config.title.endsWith('管理') ? config.title.slice(0, -2) : config.title
 
   return (
@@ -474,7 +501,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
         </div>
         <div className="flex gap-2">
           <button className="btn btn-sm btn-ghost desklink-icon-action border border-base-300 bg-white" onClick={() => void load()} title="刷新"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /></button>
-          {!config.readOnly && config.createPath && <button className="btn btn-sm desklink-action border-0 bg-emerald-600 px-4 text-white hover:bg-emerald-700" onClick={startCreate}><Plus size={16} />新增</button>}
+          {!readOnly && config.createPath && <button className="btn btn-sm desklink-action border-0 bg-emerald-600 px-4 text-white hover:bg-emerald-700" onClick={startCreate}><Plus size={16} />新增</button>}
         </div>
       </div>
 
@@ -500,7 +527,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
       <div className="desklink-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table desklink-table table-sm w-full">
-            <thead className="bg-[#f8f9fa]"><tr>{config.columns.map((column) => <th key={column.key} className="h-10 whitespace-nowrap">{column.label}</th>)}{(!config.readOnly && (config.updatePath || config.deletePath)) && <th className="w-24 text-right">操作</th>}</tr></thead>
+            <thead className="bg-[#f8f9fa]"><tr>{config.columns.map((column) => <th key={column.key} className="h-10 whitespace-nowrap">{column.label}</th>)}{(!readOnly && (config.updatePath || config.deletePath)) && <th className="w-24 text-right">操作</th>}</tr></thead>
             <tbody>
               {loading ? (
                 <tr><td colSpan={config.columns.length + 1} className="h-52 text-center"><span className="loading loading-spinner loading-md text-success" /></td></tr>
@@ -509,7 +536,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
               ) : data.list.map((row, index) => (
                 <tr key={String(row[config.idKey || 'id'] ?? index)} className={`hover:bg-base-200/40 ${config.detailPath ? 'cursor-pointer' : ''}`} onClick={() => void openDetail(row)}>
                   {config.columns.map((column) => <td key={column.key}>{column.format === 'user' ? <span>{users[String(row[column.key])] ? `${users[String(row[column.key])]} (${row[column.key]})` : row[column.key] || '—'}</span> : <Cell column={column} value={row[column.key]} />}</td>)}
-                  {!config.readOnly && (config.updatePath || config.deletePath) && (
+                  {!readOnly && (config.updatePath || config.deletePath) && (
                     <td><div className="flex justify-end gap-1">{config.detailPath && <button className="btn btn-ghost btn-xs" onClick={(event) => { event.stopPropagation(); void openDetail(row) }} title="详情">详情</button>}{config.updatePath && <button className="btn btn-ghost btn-xs" onClick={(event) => { event.stopPropagation(); startEdit(row) }} title="编辑"><Pencil size={14} /></button>}{config.deletePath && <button className="btn btn-ghost btn-xs text-error" onClick={(event) => { event.stopPropagation(); void remove(row) }} title="删除"><Trash2 size={14} /></button>}</div></td>
                   )}
                 </tr>
