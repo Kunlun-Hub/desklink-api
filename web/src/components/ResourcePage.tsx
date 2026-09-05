@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { errorMessage, get, normalizePage, post, type PageData } from '../lib/api'
 import { useToast } from './Toast'
 import type { ResourceColumn, ResourceConfig, ResourceField } from '../features/resources'
@@ -123,6 +123,61 @@ function toDateTimeLocal(timestamp: number) {
   return local.toISOString().slice(0, 16)
 }
 
+function formatDateTimeLocal(value: string) {
+  if (!value) return '选择日期和时间'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '选择日期和时间'
+  const datePart = date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  const timePart = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return `${datePart} ${timePart}`
+}
+
+function DateTimePicker({ label, value, min, max, alignEnd, onChange }: { label: string; value: string; min?: string; max?: string; alignEnd?: boolean; onChange: (value: string) => void }) {
+  const detailsRef = useRef<HTMLDetailsElement>(null)
+  const selected = useMemo(() => {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? new Date() : date
+  }, [value])
+  const [viewMonth, setViewMonth] = useState(() => new Date(selected.getFullYear(), selected.getMonth(), 1))
+  useEffect(() => setViewMonth(new Date(selected.getFullYear(), selected.getMonth(), 1)), [selected])
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      if (!detailsRef.current?.contains(event.target as Node)) detailsRef.current?.removeAttribute('open')
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [])
+  const minTime = min ? new Date(min).getTime() : Number.NEGATIVE_INFINITY
+  const maxTime = max ? new Date(max).getTime() : Number.POSITIVE_INFINITY
+  const commit = (date: Date) => {
+    const bounded = new Date(Math.max(minTime, Math.min(maxTime, date.getTime())))
+    onChange(toDateTimeLocal(bounded.getTime()))
+  }
+  const firstDay = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1)
+  const mondayOffset = (firstDay.getDay() + 6) % 7
+  const calendarStart = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1 - mondayOffset)
+  const days = Array.from({ length: 42 }, (_, index) => new Date(calendarStart.getFullYear(), calendarStart.getMonth(), calendarStart.getDate() + index))
+  const sameDay = (first: Date, second: Date) => first.getFullYear() === second.getFullYear() && first.getMonth() === second.getMonth() && first.getDate() === second.getDate()
+  const dayDisabled = (day: Date) => {
+    const start = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime()
+    const end = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999).getTime()
+    return end < minTime || start > maxTime
+  }
+  const setTime = (hour: number, minute: number) => commit(new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), hour, minute))
+  return <label className="desklink-field min-w-52 flex-1">
+    <span className="label text-xs text-base-content/55">{label}</span>
+    <details ref={detailsRef} className="group relative z-40 w-full" onToggle={(event) => { if (event.currentTarget.open) setViewMonth(new Date(selected.getFullYear(), selected.getMonth(), 1)) }}>
+      <summary className="input input-bordered input-sm flex w-full cursor-pointer list-none items-center gap-2 bg-white text-sm focus:border-emerald-500 focus:outline-none [&::-webkit-details-marker]:hidden"><CalendarDays size={15} className="text-base-content/45" /><span className="min-w-0 flex-1 truncate">{formatDateTimeLocal(value)}</span></summary>
+      <div className={`invisible absolute bottom-full z-50 mb-2 w-[min(304px,calc(100vw-3rem))] rounded-md border border-base-300 bg-white p-3 opacity-0 shadow-xl transition-none group-open:visible group-open:opacity-100 ${alignEnd ? 'right-0' : 'left-0'}`}>
+        <div className="mb-2 flex h-8 items-center justify-between"><button type="button" className="btn btn-ghost btn-xs h-8 w-8 p-0" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))} title="上个月"><ChevronLeft size={16} /></button><span className="text-sm font-semibold">{viewMonth.getFullYear()} 年 {viewMonth.getMonth() + 1} 月</span><button type="button" className="btn btn-ghost btn-xs h-8 w-8 p-0" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))} title="下个月"><ChevronRight size={16} /></button></div>
+        <div className="mb-1 grid grid-cols-7 text-center text-[11px] text-base-content/45">{['一', '二', '三', '四', '五', '六', '日'].map((day) => <span key={day} className="py-1">{day}</span>)}</div>
+        <div className="grid grid-cols-7 gap-1">{days.map((day) => { const active = sameDay(day, selected); const today = sameDay(day, new Date()); const outside = day.getMonth() !== viewMonth.getMonth(); const disabled = dayDisabled(day); return <button key={day.toISOString()} type="button" disabled={disabled} className={`btn btn-xs h-8 min-h-8 w-8 rounded-md p-0 font-normal ${active ? 'border-0 bg-emerald-600 text-white hover:bg-emerald-700' : today ? 'border border-emerald-500 bg-emerald-50 text-emerald-700' : 'btn-ghost'} ${outside && !active ? 'text-base-content/25' : ''}`} onClick={() => commit(new Date(day.getFullYear(), day.getMonth(), day.getDate(), selected.getHours(), selected.getMinutes()))}>{day.getDate()}</button> })}</div>
+        <div className="mt-3 flex items-center gap-2 border-t border-base-200 pt-3"><Clock3 size={15} className="text-base-content/45" /><select className="select select-bordered select-xs w-16 bg-white" value={String(selected.getHours()).padStart(2, '0')} onChange={(event) => setTime(Number(event.target.value), selected.getMinutes())}>{Array.from({ length: 24 }, (_, hour) => <option key={hour} value={String(hour).padStart(2, '0')}>{String(hour).padStart(2, '0')}</option>)}</select><span className="text-base-content/45">:</span><select className="select select-bordered select-xs w-16 bg-white" value={String(selected.getMinutes()).padStart(2, '0')} onChange={(event) => setTime(selected.getHours(), Number(event.target.value))}>{Array.from({ length: 60 }, (_, minute) => <option key={minute} value={String(minute).padStart(2, '0')}>{String(minute).padStart(2, '0')}</option>)}</select><button type="button" className="btn btn-xs ml-auto border-0 bg-emerald-600 px-3 text-white hover:bg-emerald-700" onClick={() => detailsRef.current?.removeAttribute('open')}><Check size={14} />确定</button></div>
+      </div>
+    </details>
+  </label>
+}
+
 function DeviceDetail({ detail, samples, range, onRangeChange, onCustomRange }: { detail: Row; samples: MetricSample[]; range: string; onRangeChange: (range: string) => void; onCustomRange: (from: number, to: number) => void }) {
   const peer = (detail.peer || {}) as Row
   const disks = diskEntries(detail.disks || peer.disk_usage)
@@ -153,8 +208,8 @@ function DeviceDetail({ detail, samples, range, onRangeChange, onCustomRange }: 
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold">资源使用趋势</h4><div className="join">{ranges.map((item) => <button key={item.value} className={`btn btn-xs join-item ${range === item.value ? 'btn-neutral' : 'btn-ghost border border-base-300'}`} onClick={() => onRangeChange(item.value)}>{item.label}</button>)}</div></div>
       <div className="mb-3 flex flex-wrap items-end gap-2 rounded-md border border-base-200 bg-base-200/20 p-3">
-        <label className="desklink-field min-w-52 flex-1"><span className="label text-xs text-base-content/55">开始时间</span><input type="datetime-local" className="input input-bordered input-sm w-full bg-white" value={customFrom} max={customTo} onChange={(event) => setCustomFrom(event.target.value)} /></label>
-        <label className="desklink-field min-w-52 flex-1"><span className="label text-xs text-base-content/55">结束时间</span><input type="datetime-local" className="input input-bordered input-sm w-full bg-white" value={customTo} min={customFrom} onChange={(event) => setCustomTo(event.target.value)} /></label>
+        <DateTimePicker label="开始时间" value={customFrom} max={customTo} onChange={setCustomFrom} />
+        <DateTimePicker label="结束时间" value={customTo} min={customFrom} alignEnd onChange={setCustomTo} />
         <button className={`btn btn-sm desklink-action px-4 ${range === 'custom' ? 'btn-neutral' : 'btn-ghost border border-base-300 bg-white'}`} onClick={queryCustomRange}><CalendarDays size={15} />查询</button>
       </div>
       <MetricChart samples={samples} />
