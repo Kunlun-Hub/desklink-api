@@ -94,6 +94,7 @@ func setupRecordingTest(t *testing.T) *RecordingService {
 		&model.SessionRecording{}, &model.RecordingStorageSetting{},
 		&model.AccessRule{},
 		&model.AgentMetricSample{}, &model.AgentMetricsSetting{},
+		&model.DeviceCredential{},
 	); err != nil {
 		t.Fatal(err)
 	}

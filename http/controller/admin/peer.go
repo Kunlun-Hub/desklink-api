@@ -65,6 +65,41 @@ func (ct *Peer) Metrics(c *gin.Context) {
 	response.Success(c, gin.H{"peer_id": peer.Id, "samples": samples, "from": from, "to": to})
 }
 
+func (ct *Peer) Credentials(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.Fail(c, 101, "invalid device id")
+		return
+	}
+	peer := service.AllService.PeerService.InfoByRowId(uint(id))
+	if peer.RowId == 0 {
+		response.Fail(c, 404, response.TranslateMsg(c, "ItemNotFound"))
+		return
+	}
+	secrets, status, err := service.DeviceCredentials(peer.Id)
+	if err != nil {
+		response.Fail(c, 101, err.Error())
+		return
+	}
+	if c.Query("reveal") != "1" {
+		response.Success(c, status)
+		return
+	}
+	value := gin.H{"status": status}
+	switch c.Query("kind") {
+	case "temporary":
+		value["temporary_password"] = secrets.TemporaryPassword
+	case "permanent":
+		value["permanent_password"] = secrets.PermanentPassword
+	default:
+		response.Fail(c, 101, "invalid credential kind")
+		return
+	}
+	response.Success(c, value)
+}
+
 // Create 创建设备
 // @Tags 设备
 // @Summary 创建设备

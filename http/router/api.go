@@ -62,6 +62,7 @@ func ApiInit(g *gin.Engine) {
 		frg.POST("/sysinfo", pe.SysInfo)
 		frg.POST("/sysinfo_ver", pe.SysInfoVer)
 		frg.POST("/agent/metrics", pe.AgentMetrics)
+		frg.POST("/agent/credentials", pe.DeviceCredentials)
 	}
 
 	if global.Config.App.WebClient == 1 {

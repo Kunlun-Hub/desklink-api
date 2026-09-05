@@ -196,6 +196,9 @@ func (ps *PeerService) Delete(u *model.Peer) error {
 	if err != nil {
 		return err
 	}
+	if err = DB.Where("peer_id = ?", u.Id).Delete(&model.DeviceCredential{}).Error; err != nil {
+		return err
+	}
 	// 删除token
 	return AllService.UserService.FlushTokenByUuid(uuid)
 }
@@ -219,8 +222,15 @@ func (ps *PeerService) GetUuidListByIDs(ids []uint) ([]string, error) {
 // BatchDelete 批量删除, 同时也应该删除token
 func (ps *PeerService) BatchDelete(ids []uint) error {
 	uuids, err := ps.GetUuidListByIDs(ids)
+	var peerIds []string
+	if err = DB.Model(&model.Peer{}).Where("row_id in (?)", ids).Pluck("id", &peerIds).Error; err != nil {
+		return err
+	}
 	err = DB.Where("row_id in (?)", ids).Delete(&model.Peer{}).Error
 	if err != nil {
+		return err
+	}
+	if err = DB.Where("peer_id in (?)", peerIds).Delete(&model.DeviceCredential{}).Error; err != nil {
 		return err
 	}
 	// 删除token

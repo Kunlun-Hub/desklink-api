@@ -181,6 +181,7 @@ func PeerBind(rg *gin.RouterGroup) {
 		aR.GET("/list", cont.List)
 		aR.GET("/detail/:id", cont.Detail)
 		aR.GET("/metrics/:id", cont.Metrics)
+		aR.GET("/credentials/:id", cont.Credentials)
 		aR.POST("/create", cont.Create)
 		aR.POST("/update", cont.Update)
 		aR.POST("/delete", cont.Delete)

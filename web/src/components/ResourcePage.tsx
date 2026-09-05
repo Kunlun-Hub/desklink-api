@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Eye, LoaderCircle, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { errorMessage, get, normalizePage, post, type PageData } from '../lib/api'
 import { useToast } from './Toast'
 import type { ResourceColumn, ResourceConfig, ResourceField } from '../features/resources'
@@ -31,6 +31,18 @@ type MetricSample = {
   cpu_usage?: number
   memory_usage?: number
   disk_usage?: string | Array<{ usage?: number }>
+}
+
+type DeviceCredentialStatus = {
+  has_temporary?: boolean
+  has_permanent?: boolean
+  temporary_updated_at?: number
+  permanent_updated_at?: number
+}
+
+type RevealedCredentials = {
+  temporary_password?: string
+  permanent_password?: string
 }
 
 function formatBytes(value: unknown) {
@@ -178,7 +190,7 @@ function DateTimePicker({ label, value, min, max, alignEnd, onChange }: { label:
   </label>
 }
 
-function DeviceDetail({ detail, samples, range, onRangeChange, onCustomRange }: { detail: Row; samples: MetricSample[]; range: string; onRangeChange: (range: string) => void; onCustomRange: (from: number, to: number) => void }) {
+function DeviceDetail({ detail, samples, range, credentialStatus, revealedCredentials, revealingCredential, onRevealCredential, onRangeChange, onCustomRange }: { detail: Row; samples: MetricSample[]; range: string; credentialStatus: DeviceCredentialStatus | null; revealedCredentials: RevealedCredentials; revealingCredential: 'temporary' | 'permanent' | null; onRevealCredential: (kind: 'temporary' | 'permanent') => void; onRangeChange: (range: string) => void; onCustomRange: (from: number, to: number) => void }) {
   const peer = (detail.peer || {}) as Row
   const disks = diskEntries(detail.disks || peer.disk_usage)
   const ranges = [{ value: '1h', label: '1 小时' }, { value: '24h', label: '24 小时' }, { value: '7d', label: '7 天' }, { value: '30d', label: '30 天' }]
@@ -201,6 +213,13 @@ function DeviceDetail({ detail, samples, range, onRangeChange, onCustomRange }: 
     <div className="grid gap-3 sm:grid-cols-2">
       {[['设备 ID', peer.id], ['主机名', peer.hostname], ['CPU 型号', peer.cpu_model || peer.cpu], ['操作系统', peer.os], ['系统用户', peer.username], ['客户端版本', peer.version], ['UUID', peer.uuid]].map(([label, value]) => <div key={label} className="flex min-w-0 justify-between gap-4 rounded-md border border-base-200 p-3 text-sm"><span className="text-base-content/55">{label}</span><span className="max-w-[65%] truncate text-right" title={String(value || '')}>{String(value || '—')}</span></div>)}
     </div>
+    {credentialStatus && <div>
+      <div className="mb-2 flex items-center justify-between"><h4 className="font-semibold">托管凭据</h4><span className="text-xs text-base-content/45">查看后 15 秒自动隐藏</span></div>
+      <div className="grid gap-3 sm:grid-cols-2">{([
+        { kind: 'temporary' as const, label: '一次性密码', has: credentialStatus.has_temporary, updated: credentialStatus.temporary_updated_at, value: revealedCredentials.temporary_password },
+        { kind: 'permanent' as const, label: '固定密码', has: credentialStatus.has_permanent, updated: credentialStatus.permanent_updated_at, value: revealedCredentials.permanent_password },
+      ]).map((credential) => <div key={credential.kind} className="rounded-md border border-base-200 p-3"><div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-xs text-base-content/50">{credential.label}</div><div className="mt-1 truncate font-mono text-sm font-semibold">{credential.has ? credential.value ?? '••••••••' : '未纳管'}</div></div>{credential.has && credential.value === undefined && <button className="btn btn-ghost btn-sm desklink-icon-action" disabled={revealingCredential !== null} title={`查看${credential.label}`} onClick={() => onRevealCredential(credential.kind)}>{revealingCredential === credential.kind ? <LoaderCircle size={16} className="animate-spin" /> : <Eye size={16} />}</button>}</div><div className="mt-1 text-[11px] text-base-content/40">{credential.updated ? `更新于 ${formatDate(credential.updated)}` : '尚未上传'}</div></div>)}</div>
+    </div>}
     <div>
       <div className="mb-2 flex items-center justify-between"><h4 className="font-semibold">磁盘使用情况</h4><span className="text-xs text-base-content/45">容量单位：GB</span></div>
       <div className="grid gap-3 md:grid-cols-2">{disks.length ? disks.map((disk, index) => <div key={`${disk.mount || 'disk'}-${index}`} className="rounded-md border border-base-200 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-medium">{disk.mount || '未命名磁盘'}</span><span className="text-sm font-semibold">{Number(disk.usage || 0).toFixed(1)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-base-200"><div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(0, Math.min(100, Number(disk.usage || 0)))}%` }} /></div><div className="mt-2 text-xs text-base-content/55">{formatBytes(disk.used)} / {formatBytes(disk.total)} 已用</div></div>) : <div className="rounded-md border border-base-200 p-4 text-sm text-base-content/40">暂无磁盘数据</div>}</div>
@@ -290,6 +309,10 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
   const [detailSamples, setDetailSamples] = useState<MetricSample[]>([])
   const [detailRange, setDetailRange] = useState('24h')
   const [detailCustomRange, setDetailCustomRange] = useState<{ from: number; to: number } | null>(null)
+  const [credentialStatus, setCredentialStatus] = useState<DeviceCredentialStatus | null>(null)
+  const [revealedCredentials, setRevealedCredentials] = useState<RevealedCredentials>({})
+  const [revealingCredential, setRevealingCredential] = useState<'temporary' | 'permanent' | null>(null)
+  const credentialHideTimer = useRef<number | null>(null)
   const pageSize = config.pageSize || 20
 
   const load = useCallback(async () => {
@@ -330,6 +353,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
       setDetail(value)
       setDetailRange('24h')
       setDetailCustomRange(null)
+      setRevealedCredentials({})
       if (config.metricsPath) {
         const to = Math.floor(Date.now() / 1000)
         const from = to - 24 * 60 * 60
@@ -337,6 +361,11 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
         setDetailSamples(metrics.samples || [])
       } else {
         setDetailSamples([])
+      }
+      if (config.credentialsPath) {
+        setCredentialStatus(await get<DeviceCredentialStatus>(`${config.credentialsPath}/${row[config.idKey || 'id']}`))
+      } else {
+        setCredentialStatus(null)
       }
     } catch (error) { show(errorMessage(error), 'error') }
   }
@@ -369,6 +398,22 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
 
   const detailId = detail ? ((detail.peer || detail)[config.idKey === 'row_id' ? 'row_id' : 'id'] as string | number | undefined) : undefined
 
+  const revealCredential = async (kind: 'temporary' | 'permanent') => {
+    if (!detailId || !config.credentialsPath) return
+    setRevealingCredential(kind)
+    try {
+      const value = await get<{ status: DeviceCredentialStatus; temporary_password?: string; permanent_password?: string }>(`${config.credentialsPath}/${detailId}`, { reveal: 1, kind })
+      setCredentialStatus(value.status)
+      setRevealedCredentials((current) => ({ ...current, ...(kind === 'temporary' ? { temporary_password: value.temporary_password || '' } : { permanent_password: value.permanent_password || '' }) }))
+      if (credentialHideTimer.current !== null) window.clearTimeout(credentialHideTimer.current)
+      credentialHideTimer.current = window.setTimeout(() => { setRevealedCredentials({}); credentialHideTimer.current = null }, 15_000)
+    } catch (error) { show(errorMessage(error), 'error') } finally { setRevealingCredential(null) }
+  }
+
+  useEffect(() => () => {
+    if (credentialHideTimer.current !== null) window.clearTimeout(credentialHideTimer.current)
+  }, [])
+
   useEffect(() => {
     if (!detailId || !config.metricsPath || !config.detailPath) return
     const refresh = async () => {
@@ -381,13 +426,14 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
         const to = detailCustomRange?.to ?? currentTo
         const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${detailId}`, { from, to })
         setDetailSamples(metrics.samples || [])
+        if (config.credentialsPath) setCredentialStatus(await get<DeviceCredentialStatus>(`${config.credentialsPath}/${detailId}`))
       } catch {
         // Keep the last successful detail visible during transient requests.
       }
     }
     const timer = window.setInterval(() => { void refresh() }, 5000)
     return () => window.clearInterval(timer)
-  }, [config.detailPath, config.metricsPath, detailCustomRange, detailId, detailRange])
+  }, [config.credentialsPath, config.detailPath, config.metricsPath, detailCustomRange, detailId, detailRange])
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
@@ -503,7 +549,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
       )}
 
       {detail && (
-        <div className="modal modal-open"><div className="modal-box desklink-modal max-w-5xl rounded-lg p-0"><div className="flex h-14 items-center justify-between border-b border-base-300 px-5"><h3 className="font-semibold">设备详情</h3><button className="btn btn-ghost btn-sm" onClick={() => setDetail(null)}><X size={18} /></button></div><div className="max-h-[78vh] overflow-y-auto p-5">{config.metricsPath ? <DeviceDetail detail={detail} samples={detailSamples} range={detailRange} onRangeChange={(range) => void loadDetailRange(range)} onCustomRange={(from, to) => void loadDetailCustomRange(from, to)} /> : Object.entries(detail).map(([key, value]) => <div key={key} className="mb-4 last:mb-0"><div className="mb-2 text-sm font-semibold text-base-content/70">{detailLabels[key] || key}</div>{Array.isArray(value) ? <div className="grid gap-3 sm:grid-cols-2">{value.map((item, index) => <div key={index} className="rounded-md border border-base-200 p-3">{Object.entries(item || {}).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 border-b border-base-200 py-1.5 last:border-0"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div>)}</div> : typeof value === 'object' && value !== null ? <div className="grid gap-3 sm:grid-cols-2">{Object.entries(value).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 rounded-md border border-base-200 p-3"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div> : <div className="rounded-md border border-base-200 p-3 text-sm">{formatDetailValue(key, value)}</div>}</div>)}</div></div><button className="modal-backdrop" onClick={() => setDetail(null)} aria-label="关闭" /></div>
+        <div className="modal modal-open"><div className="modal-box desklink-modal max-w-5xl rounded-lg p-0"><div className="flex h-14 items-center justify-between border-b border-base-300 px-5"><h3 className="font-semibold">设备详情</h3><button className="btn btn-ghost btn-sm" onClick={() => { setDetail(null); setRevealedCredentials({}) }}><X size={18} /></button></div><div className="max-h-[78vh] overflow-y-auto p-5">{config.metricsPath ? <DeviceDetail detail={detail} samples={detailSamples} range={detailRange} credentialStatus={credentialStatus} revealedCredentials={revealedCredentials} revealingCredential={revealingCredential} onRevealCredential={(kind) => void revealCredential(kind)} onRangeChange={(range) => void loadDetailRange(range)} onCustomRange={(from, to) => void loadDetailCustomRange(from, to)} /> : Object.entries(detail).map(([key, value]) => <div key={key} className="mb-4 last:mb-0"><div className="mb-2 text-sm font-semibold text-base-content/70">{detailLabels[key] || key}</div>{Array.isArray(value) ? <div className="grid gap-3 sm:grid-cols-2">{value.map((item, index) => <div key={index} className="rounded-md border border-base-200 p-3">{Object.entries(item || {}).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 border-b border-base-200 py-1.5 last:border-0"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div>)}</div> : typeof value === 'object' && value !== null ? <div className="grid gap-3 sm:grid-cols-2">{Object.entries(value).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 rounded-md border border-base-200 p-3"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div> : <div className="rounded-md border border-base-200 p-3 text-sm">{formatDetailValue(key, value)}</div>}</div>)}</div></div><button className="modal-backdrop" onClick={() => { setDetail(null); setRevealedCredentials({}) }} aria-label="关闭" /></div>
       )}
     </section>
   )

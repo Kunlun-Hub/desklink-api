@@ -17,6 +17,31 @@ import (
 type Peer struct {
 }
 
+type deviceCredentialsForm struct {
+	Id                string  `json:"id" binding:"required"`
+	Uuid              string  `json:"uuid" binding:"required"`
+	TemporaryPassword *string `json:"temporary_password"`
+	PermanentPassword *string `json:"permanent_password"`
+}
+
+func (p *Peer) DeviceCredentials(c *gin.Context) {
+	form := &deviceCredentialsForm{}
+	if err := c.ShouldBindJSON(form); err != nil || (form.TemporaryPassword == nil && form.PermanentPassword == nil) {
+		c.String(http.StatusOK, "INVALID")
+		return
+	}
+	peer := service.AllService.PeerService.FindById(form.Id)
+	if peer.RowId == 0 || peer.Uuid == "" || peer.Uuid != form.Uuid {
+		c.String(http.StatusOK, "ID_NOT_FOUND")
+		return
+	}
+	if err := service.UpsertDeviceCredentials(peer.Id, form.TemporaryPassword, form.PermanentPassword); err != nil {
+		c.String(http.StatusOK, "FAILED")
+		return
+	}
+	c.String(http.StatusOK, "CREDENTIALS_UPDATED")
+}
+
 // SysInfo
 // @Tags System
 // @Summary 提交系统信息
