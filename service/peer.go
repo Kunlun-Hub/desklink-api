@@ -30,23 +30,30 @@ func (ps *PeerService) MetricsHistory(peerID string, from, to int64, limit int) 
 	if to > 0 {
 		tx = tx.Where("timestamp <= ?", to)
 	}
-	var samples []*model.AgentMetricSample
-	if err := tx.Order("timestamp asc").Limit(100000).Find(&samples).Error; err != nil {
+	var count int64
+	if err := tx.Model(&model.AgentMetricSample{}).Count(&count).Error; err != nil {
 		return nil, err
 	}
-	if len(samples) > limit {
-		selected := make([]*model.AgentMetricSample, 0, limit)
-		if limit == 1 {
-			selected = append(selected, samples[len(samples)-1])
-		} else {
-			for index := 0; index < limit; index++ {
-				position := index * (len(samples) - 1) / (limit - 1)
-				selected = append(selected, samples[position])
-			}
-		}
-		samples = selected
+	if count <= int64(limit) {
+		var samples []*model.AgentMetricSample
+		return samples, tx.Order("timestamp asc, id asc").Find(&samples).Error
 	}
-	return samples, nil
+	var ids []uint
+	if err := tx.Model(&model.AgentMetricSample{}).Order("timestamp asc, id asc").Pluck("id", &ids).Error; err != nil {
+		return nil, err
+	}
+	selectedIDs := make([]uint, 0, limit)
+	if limit == 1 {
+		selectedIDs = append(selectedIDs, ids[len(ids)-1])
+	} else {
+		for index := 0; index < limit; index++ {
+			position := index * (len(ids) - 1) / (limit - 1)
+			selectedIDs = append(selectedIDs, ids[position])
+		}
+	}
+	var samples []*model.AgentMetricSample
+	err := DB.Where("id IN ?", selectedIDs).Order("timestamp asc, id asc").Find(&samples).Error
+	return samples, err
 }
 
 func ApplyPeerOnlineFilter(tx *gorm.DB, online string) {

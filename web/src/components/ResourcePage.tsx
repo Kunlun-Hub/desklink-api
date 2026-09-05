@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ChevronLeft, ChevronRight, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { CalendarDays, ChevronLeft, ChevronRight, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { errorMessage, get, normalizePage, post, type PageData } from '../lib/api'
 import { useToast } from './Toast'
 import type { ResourceColumn, ResourceConfig, ResourceField } from '../features/resources'
@@ -82,7 +82,8 @@ function smoothMetricPath(points: number[], padding: { left: number; top: number
 
 function MetricChart({ samples }: { samples: MetricSample[] }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
-  const width = 720
+  const chartRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(720)
   const height = 220
   const padding = { left: 38, right: 16, top: 18, bottom: 28 }
   const plotWidth = width - padding.left - padding.right
@@ -92,10 +93,19 @@ function MetricChart({ samples }: { samples: MetricSample[] }) {
     { key: 'memory_usage', label: '内存', color: '#2563eb', points: samples.map((sample) => Number(sample.memory_usage || 0)) },
     { key: 'disk_usage', label: '磁盘', color: '#16a34a', points: samples.map((sample) => averageDiskUsage(sample.disk_usage)) },
   ]
+  const hasSamples = samples.length > 0
+  useEffect(() => {
+    if (!hasSamples || !chartRef.current) return
+    const resize = () => setWidth(Math.max(320, Math.floor(chartRef.current?.getBoundingClientRect().width || 720)))
+    resize()
+    const observer = new ResizeObserver(resize)
+    observer.observe(chartRef.current)
+    return () => observer.disconnect()
+  }, [hasSamples])
   return (
     <div className="overflow-hidden rounded-md border border-base-200 bg-white p-3">
       <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-base-content/65">{values.map((value) => <span key={value.key} className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: value.color }} />{value.label}</span>)}</div>
-      {samples.length ? <div className="relative"><svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full touch-none" role="img" aria-label="资源使用率趋势图" onPointerLeave={() => setHoverIndex(null)}>
+      {samples.length ? <div ref={chartRef} className="relative w-full"><svg viewBox={`0 0 ${width} ${height}`} className="w-full touch-none" style={{ height }} role="img" aria-label="资源使用率趋势图" onPointerLeave={() => setHoverIndex(null)}>
         {[0, 25, 50, 75, 100].map((tick) => { const y = padding.top + plotHeight - tick / 100 * plotHeight; return <g key={tick}><line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#e5e7eb" strokeWidth="1" /><text x={padding.left - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#6b7280">{tick}%</text></g> })}
         <rect x={padding.left} y={padding.top} width={plotWidth} height={plotHeight} fill="transparent" pointerEvents="all" onPointerMove={(event) => { const svg = event.currentTarget.ownerSVGElement; const matrix = svg?.getScreenCTM(); if (!matrix || !svg) return; const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()); const index = samples.length <= 1 ? 0 : Math.max(0, Math.min(samples.length - 1, Math.round((point.x - padding.left) / plotWidth * (samples.length - 1)))); setHoverIndex(index) }} />
         {values.map((value) => <path key={value.key} d={smoothMetricPath(value.points, padding, plotWidth, plotHeight)} fill="none" stroke={value.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none" />)}
@@ -107,10 +117,23 @@ function MetricChart({ samples }: { samples: MetricSample[] }) {
   )
 }
 
-function DeviceDetail({ detail, samples, range, onRangeChange }: { detail: Row; samples: MetricSample[]; range: string; onRangeChange: (range: string) => void }) {
+function toDateTimeLocal(timestamp: number) {
+  const date = new Date(timestamp)
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
+
+function DeviceDetail({ detail, samples, range, onRangeChange, onCustomRange }: { detail: Row; samples: MetricSample[]; range: string; onRangeChange: (range: string) => void; onCustomRange: (from: number, to: number) => void }) {
   const peer = (detail.peer || {}) as Row
   const disks = diskEntries(detail.disks || peer.disk_usage)
   const ranges = [{ value: '1h', label: '1 小时' }, { value: '24h', label: '24 小时' }, { value: '7d', label: '7 天' }, { value: '30d', label: '30 天' }]
+  const [customFrom, setCustomFrom] = useState(() => toDateTimeLocal(Date.now() - 24 * 60 * 60 * 1000))
+  const [customTo, setCustomTo] = useState(() => toDateTimeLocal(Date.now()))
+  const queryCustomRange = () => {
+    const from = new Date(customFrom).getTime()
+    const to = new Date(customTo).getTime()
+    if (Number.isFinite(from) && Number.isFinite(to) && from < to) onCustomRange(Math.floor(from / 1000), Math.floor(to / 1000))
+  }
   return <div className="space-y-4">
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       <div className="rounded-md border border-base-200 bg-base-200/30 p-3"><div className="text-xs text-base-content/50">在线状态</div><div className={`mt-1 text-lg font-semibold ${peer.online ? 'text-emerald-600' : 'text-base-content/55'}`}>{peer.online ? '在线' : '离线'}</div><div className="mt-1 text-xs text-base-content/45">最后心跳 {formatDate(peer.last_online_time)}</div></div>
@@ -129,6 +152,11 @@ function DeviceDetail({ detail, samples, range, onRangeChange }: { detail: Row; 
     </div>
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold">资源使用趋势</h4><div className="join">{ranges.map((item) => <button key={item.value} className={`btn btn-xs join-item ${range === item.value ? 'btn-neutral' : 'btn-ghost border border-base-300'}`} onClick={() => onRangeChange(item.value)}>{item.label}</button>)}</div></div>
+      <div className="mb-3 flex flex-wrap items-end gap-2 rounded-md border border-base-200 bg-base-200/20 p-3">
+        <label className="desklink-field min-w-52 flex-1"><span className="label text-xs text-base-content/55">开始时间</span><input type="datetime-local" className="input input-bordered input-sm w-full bg-white" value={customFrom} max={customTo} onChange={(event) => setCustomFrom(event.target.value)} /></label>
+        <label className="desklink-field min-w-52 flex-1"><span className="label text-xs text-base-content/55">结束时间</span><input type="datetime-local" className="input input-bordered input-sm w-full bg-white" value={customTo} min={customFrom} onChange={(event) => setCustomTo(event.target.value)} /></label>
+        <button className={`btn btn-sm desklink-action px-4 ${range === 'custom' ? 'btn-neutral' : 'btn-ghost border border-base-300 bg-white'}`} onClick={queryCustomRange}><CalendarDays size={15} />查询</button>
+      </div>
       <MetricChart samples={samples} />
     </div>
   </div>
@@ -206,6 +234,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
   const [detail, setDetail] = useState<Row | null>(null)
   const [detailSamples, setDetailSamples] = useState<MetricSample[]>([])
   const [detailRange, setDetailRange] = useState('24h')
+  const [detailCustomRange, setDetailCustomRange] = useState<{ from: number; to: number } | null>(null)
   const pageSize = config.pageSize || 20
 
   const load = useCallback(async () => {
@@ -245,6 +274,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
       const value = await get<Row>(`${config.detailPath}/${row[config.idKey || 'id']}`)
       setDetail(value)
       setDetailRange('24h')
+      setDetailCustomRange(null)
       if (config.metricsPath) {
         const to = Math.floor(Date.now() / 1000)
         const from = to - 24 * 60 * 60
@@ -266,6 +296,19 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
       const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${id}`, { from: to - seconds, to })
       setDetailSamples(metrics.samples || [])
       setDetailRange(range)
+      setDetailCustomRange(null)
+    } catch (error) { show(errorMessage(error), 'error') }
+  }
+
+  const loadDetailCustomRange = async (from: number, to: number) => {
+    if (!detail || !config.metricsPath) return
+    const peer = (detail.peer || detail) as Row
+    const id = config.idKey === 'row_id' ? peer.row_id : peer.id
+    try {
+      const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${id}`, { from, to })
+      setDetailSamples(metrics.samples || [])
+      setDetailRange('custom')
+      setDetailCustomRange({ from, to })
     } catch (error) { show(errorMessage(error), 'error') }
   }
 
@@ -278,8 +321,10 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
         const value = await get<Row>(`${config.detailPath}/${detailId}`)
         setDetail(value)
         const seconds = detailRange === '1h' ? 3600 : detailRange === '7d' ? 7 * 86400 : detailRange === '30d' ? 30 * 86400 : 86400
-        const to = Math.floor(Date.now() / 1000)
-        const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${detailId}`, { from: to - seconds, to })
+        const currentTo = Math.floor(Date.now() / 1000)
+        const from = detailCustomRange?.from ?? currentTo - seconds
+        const to = detailCustomRange?.to ?? currentTo
+        const metrics = await get<{ samples?: MetricSample[] }>(`${config.metricsPath}/${detailId}`, { from, to })
         setDetailSamples(metrics.samples || [])
       } catch {
         // Keep the last successful detail visible during transient requests.
@@ -287,7 +332,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
     }
     const timer = window.setInterval(() => { void refresh() }, 5000)
     return () => window.clearInterval(timer)
-  }, [config.detailPath, config.metricsPath, detailId, detailRange])
+  }, [config.detailPath, config.metricsPath, detailCustomRange, detailId, detailRange])
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
@@ -403,7 +448,7 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
       )}
 
       {detail && (
-        <div className="modal modal-open"><div className="modal-box desklink-modal max-w-5xl rounded-lg p-0"><div className="flex h-14 items-center justify-between border-b border-base-300 px-5"><h3 className="font-semibold">设备详情</h3><button className="btn btn-ghost btn-sm" onClick={() => setDetail(null)}><X size={18} /></button></div><div className="max-h-[78vh] overflow-y-auto p-5">{config.metricsPath ? <DeviceDetail detail={detail} samples={detailSamples} range={detailRange} onRangeChange={(range) => void loadDetailRange(range)} /> : Object.entries(detail).map(([key, value]) => <div key={key} className="mb-4 last:mb-0"><div className="mb-2 text-sm font-semibold text-base-content/70">{detailLabels[key] || key}</div>{Array.isArray(value) ? <div className="grid gap-3 sm:grid-cols-2">{value.map((item, index) => <div key={index} className="rounded-md border border-base-200 p-3">{Object.entries(item || {}).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 border-b border-base-200 py-1.5 last:border-0"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div>)}</div> : typeof value === 'object' && value !== null ? <div className="grid gap-3 sm:grid-cols-2">{Object.entries(value).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 rounded-md border border-base-200 p-3"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div> : <div className="rounded-md border border-base-200 p-3 text-sm">{formatDetailValue(key, value)}</div>}</div>)}</div></div><button className="modal-backdrop" onClick={() => setDetail(null)} aria-label="关闭" /></div>
+        <div className="modal modal-open"><div className="modal-box desklink-modal max-w-5xl rounded-lg p-0"><div className="flex h-14 items-center justify-between border-b border-base-300 px-5"><h3 className="font-semibold">设备详情</h3><button className="btn btn-ghost btn-sm" onClick={() => setDetail(null)}><X size={18} /></button></div><div className="max-h-[78vh] overflow-y-auto p-5">{config.metricsPath ? <DeviceDetail detail={detail} samples={detailSamples} range={detailRange} onRangeChange={(range) => void loadDetailRange(range)} onCustomRange={(from, to) => void loadDetailCustomRange(from, to)} /> : Object.entries(detail).map(([key, value]) => <div key={key} className="mb-4 last:mb-0"><div className="mb-2 text-sm font-semibold text-base-content/70">{detailLabels[key] || key}</div>{Array.isArray(value) ? <div className="grid gap-3 sm:grid-cols-2">{value.map((item, index) => <div key={index} className="rounded-md border border-base-200 p-3">{Object.entries(item || {}).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 border-b border-base-200 py-1.5 last:border-0"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div>)}</div> : typeof value === 'object' && value !== null ? <div className="grid gap-3 sm:grid-cols-2">{Object.entries(value).map(([itemKey, itemValue]) => <div key={itemKey} className="flex justify-between gap-3 rounded-md border border-base-200 p-3"><span className="text-xs text-base-content/50">{detailLabels[itemKey] || itemKey}</span><span className="text-right text-sm">{formatDetailValue(itemKey, itemValue)}</span></div>)}</div> : <div className="rounded-md border border-base-200 p-3 text-sm">{formatDetailValue(key, value)}</div>}</div>)}</div></div><button className="modal-backdrop" onClick={() => setDetail(null)} aria-label="关闭" /></div>
       )}
     </section>
   )
