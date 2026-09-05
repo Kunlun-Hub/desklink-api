@@ -39,9 +39,13 @@ jobs:
           platforms: linux/amd64
           push: true
           provenance: false
-          tags: ${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
+            ${{ env.IMAGE_NAME }}:latest
 
       - name: Verify published image
         env:
           IMAGE_TAG: ${{ inputs.image_tag }}
-        run: docker buildx imagetools inspect "${IMAGE_NAME}:${IMAGE_TAG}"
+        run: |
+          docker buildx imagetools inspect "${IMAGE_NAME}:${IMAGE_TAG}"
+          docker buildx imagetools inspect "${IMAGE_NAME}:latest"
